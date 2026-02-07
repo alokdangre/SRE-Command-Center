@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { TamboProvider } from "@tambo-ai/react";
+import { TamboProviderWithAuth } from "@/components/auth/tambo-provider-with-auth";
 import {
     MessageInput,
     MessageInputSubmitButton,
@@ -23,6 +23,7 @@ import { useMcpServers } from "@/components/tambo/mcp-config-modal";
 import { components, tools } from "@/lib/tambo";
 import { RemediationPanel } from "@/components/sre/remediation-panel";
 import { AsciiLogo, AsciiStatus } from "@/components/sre/ascii-art";
+import { UserNav } from "@/components/auth/user-nav";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     AlertTriangle,
@@ -39,7 +40,9 @@ import {
     Clock,
     Cpu,
     Database,
+    Settings,
 } from "lucide-react";
+import Link from "next/link";
 
 const DictationButton = dynamic(() => import("@/components/tambo/dictation-button"), {
     ssr: false,
@@ -85,7 +88,15 @@ function TerminalHeader() {
                 </div>
             </div>
             <div className="flex items-center gap-4">
-                <span className="text-cyan-500/70">SESSION: 0xc4ffde21</span>
+                <Link
+                    href="/settings"
+                    className="p-2 hover:bg-gray-800 rounded transition-colors"
+                    title="Settings & Integrations"
+                >
+                    <Settings className="w-4 h-4 text-gray-400 hover:text-cyan-400" />
+                </Link>
+                <UserNav />
+                <span className="text-cyan-500/70 hidden sm:inline">SESSION: 0xc4ffde21</span>
                 <span className="text-white bg-gray-900 px-2 py-0.5 rounded border border-gray-800">
                     {time.toLocaleTimeString()}
                 </span>
@@ -99,11 +110,9 @@ export default function SRECommandCenter() {
     const mcpServers = useMcpServers();
 
     return (
-        <TamboProvider
-            apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+        <TamboProviderWithAuth
             components={components}
             tools={tools}
-            tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}
             mcpServers={mcpServers}
         >
             <div className="flex flex-col h-screen bg-black text-white selection:bg-cyan-500/30 font-mono">
@@ -239,6 +248,6 @@ export default function SRECommandCenter() {
                     </AnimatePresence>
                 </div>
             </div>
-        </TamboProvider>
+        </TamboProviderWithAuth>
     );
 }

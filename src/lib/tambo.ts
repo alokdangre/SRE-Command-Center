@@ -33,6 +33,7 @@ import {
   getRootCauseAnalysis,
   getIncidentTimelineData,
   getAnomalyHeatmapData,
+  getIntegrations,
 } from "@/services/sre-tools";
 
 // Import local browser tools
@@ -401,6 +402,21 @@ export const tools: TamboTool[] = [
       offsetString: z.string(),
       currentTime: z.string(),
     }),
+  },
+  {
+    name: "getIntegrations",
+    description:
+      "Get the status of all configured integrations (GitHub, Prometheus, Slack, Kubernetes). Shows which data sources are connected.",
+    tool: getIntegrations,
+    inputSchema: z.object({}),
+    outputSchema: z.array(
+      z.object({
+        name: z.string(),
+        enabled: z.boolean(),
+        status: z.enum(["connected", "disconnected", "error"]),
+        details: z.string().optional(),
+      })
+    ),
   },
 ];
 
