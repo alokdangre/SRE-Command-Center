@@ -1,131 +1,103 @@
-# Tambo Template
+# SRE Command Center 🛡️🚀
 
-This is a starter NextJS app with Tambo hooked up to get your AI app development started quickly.
+> **Autonomous Incident Response System // Neural-link Enabled // Multi-tool Orchestration**
 
-## Get Started
+![SRE Command Center Banner](public/grid.svg)
 
-1. Run `npm create-tambo@latest my-tambo-app` for a new project
+## 📖 Introduction
 
-2. `npm install`
+**SRE Command Center** is a futuristic, AI-driven dashboard designed for Site Reliability Engineers (SREs). It transforms standard monitoring into a high-octane, "Cyber-aesthetic" visual experience.
 
-3. `npx tambo init`
+Moving beyond simple charts, this application integrates **Generative UI** concepts to provide real-time telemetry, automated root cause analysis, and interactive remediation tools in a single, immersive capability-based interface.
 
-- or rename `example.env.local` to `.env.local` and add your tambo API key you can get for free [here](https://tambo.co/dashboard).
+It is built to look and feel like a sci-fi "War Room" console, making the high-pressure job of incident management more intuitive and engaging.
 
-4. Run `npm run dev` and go to `localhost:3000` to use the app!
+## ✨ Key Features
 
-## Customizing
+### 1. 🖥️ Service Status Matrix (`ServiceStatusGrid`)
 
-### Change what components tambo can control
+A real-time "Head-Up Display" (HUD) for your entire infrastructure.
 
-You can see how components are registered with tambo in `src/lib/tambo.ts`:
+- **Visual Health Indicators**: Instant color-coded status (Healthy, Degraded, Critical) with scanline animations.
+- **Key Metrics**: Monitor Uptime, Latency, Error Rates, and RPS (Requests Per Second) at a glance.
+- **Micro-interactions**: Hover effects and pulse animations to draw attention to failing nodes.
 
-```tsx
-export const components: TamboComponent[] = [
-  {
-    name: "Graph",
-    description:
-      "A component that renders various types of charts (bar, line, pie) using Recharts. Supports customizable data visualization with labels, datasets, and styling options.",
-    component: Graph,
-    propsSchema: graphSchema,
-  },
-  // Add more components here
-];
-```
+### 2. 🔥 Anomaly Heatmap (`AnomalyHeatmap`)
 
-You can install the graph component into any project with:
+Detect patterns in the noise before they become outages.
 
-```bash
-npx tambo add graph
-```
+- **Temporal Visualization**: View service health over specific time windows (4h, 8h, 24h).
+- **Intensity Scoring**: Color gradients from Green (Normal) to Red (Critical) based on anomaly scores.
+- **Detailed Tooltips**: Drill down into specific time slices to see exact anomaly percentages.
 
-The example Graph component demonstrates several key features:
+### 3. 🧠 AI Root Cause Analysis (`RootCauseAnalysis`)
 
-- Different prop types (strings, arrays, enums, nested objects)
-- Multiple chart types (bar, line, pie)
-- Customizable styling (variants, sizes)
-- Optional configurations (title, legend, colors)
-- Data visualization capabilities
+Automated investigation assistant that connects symptoms to code.
 
-Update the `components` array with any component(s) you want tambo to be able to use in a response!
+- **Confidence Scoring**: AI assigns a probability percentage to its findings.
+- **Evidence Collection**: Lists specific telemetry signals that led to the conclusion.
+- **Code Correlation**: **USP Alert!** Directly links incidents to "Suspicious Code Changes" (git commits) that likely introduced the bug.
+- **Recovery Plans**: Suggests actionable remediation steps (e.g., "Rollback to Sha: a1b2c3").
 
-You can find more information about the options [here](https://docs.tambo.co/concepts/generative-interfaces/generative-components)
+### 4. ⏱️ Unified Incident Timeline (`IncidentTimeline`)
 
-### Add tools for tambo to use
+The narrative of an outage, updated in real-time.
 
-Tools are defined with `inputSchema` and `outputSchema`:
+- **Event Feed**: Chronological log of alerts, automated actions, user notes, and resolutions.
+- **Metric Drift Overlay**: Visualizes error rates directly alongside timeline events to correlate actions with results.
+- **Role Attribution**: Clearly distinguishes between AI-generated events and human operator actions.
 
-```tsx
-export const tools: TamboTool[] = [
-  {
-    name: "globalPopulation",
-    description:
-      "A tool to get global population trends with optional year range filtering",
-    tool: getGlobalPopulationTrend,
-    inputSchema: z.object({
-      startYear: z.number().optional(),
-      endYear: z.number().optional(),
-    }),
-    outputSchema: z.array(
-      z.object({
-        year: z.number(),
-        population: z.number(),
-        growthRate: z.number(),
-      }),
-    ),
-  },
-];
-```
+### 5. 💬 Delegated Chat Mode
 
-Find more information about tools [here.](https://docs.tambo.co/concepts/tools)
+- Interact with the system using natural language.
+- Ask questions like "Why is the payments service slow?" or "Scale up the database cluster."
 
-### The Magic of Tambo Requires the TamboProvider
+## 🎯 Use Cases
 
-Make sure in the TamboProvider wrapped around your app:
+- **War Room Display**: Perfect for large monitors in an operations center to provide a shared context during critical incidents.
+- **Proactive Monitoring**: Watch the Heatmap to identify "flaky" services that degrade periodically but don't trigger hard alerts.
+- **Rapid Triage**: Use the AI Root Cause Analysis to skip the initial "what changed?" investigation phase and jump straight to fixing.
+- **Post-Incident Reviews**: Use the Incident Timeline to reconstruct exactly what happened for post-mortem reports.
 
-```tsx
-...
-<TamboProvider
-  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
-  components={components} // Array of components to control
-  tools={tools} // Array of tools it can use
->
-  {children}
-</TamboProvider>
-```
+## 💎 Unique Selling Points (USP)
 
-In this example we do this in the `Layout.tsx` file, but you can do it anywhere in your app that is a client component.
+1.  **The "Cyber" Aesthetic**: Unlike sterile corporate dashboards, this app uses a "Dark Mode First", terminal-inspired design. It makes SRE work feel like piloting a spaceship, reducing fatigue and increasing engagement.
+2.  **Context-Aware AI**: It doesn't just show graphs; it tells you _why_ the graph looks like that.
+3.  **Code-to-Cloud Visibility**: Uniquely bridges the gap between infrastructure alerts and the specific application code (commits) that caused them.
+4.  **Generative HUD**: The interface modules are designed to be dynamic, potentially composed on-the-fly based on the type of incident occurring.
 
-### Voice input
+## 🚀 Getting Started
 
-The template includes a `DictationButton` component using the `useTamboVoice` hook for speech-to-text input.
+### Prerequisites
 
-### MCP (Model Context Protocol)
+- Node.js 18+
+- npm / yarn / pnpm
 
-The template includes MCP support for connecting to external tools and resources. You can use the MCP hooks from `@tambo-ai/react/mcp`:
+### Installation
 
-- `useTamboMcpPromptList` - List available prompts from MCP servers
-- `useTamboMcpPrompt` - Get a specific prompt
-- `useTamboMcpResourceList` - List available resources
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/alokdangre/SRE-Command-Center.git
+    ```
+2.  Install dependencies:
+    ```bash
+    cd SRE-Command-Center
+    npm install
+    ```
+3.  Run the development server:
+    ```bash
+    npm run dev
+    ```
+4.  Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-See `src/components/tambo/mcp-components.tsx` for example usage.
+## 🛠️ Tech Stack
 
-### Change where component responses are shown
+- **Framework**: Next.js 14 (App Router)
+- **Styling**: Tailwind CSS + Custom Animations
+- **Icons**: Lucide React
+- **Validation**: Zod
+- **Animation**: Framer Motion
 
-The components used by tambo are shown alongside the message response from tambo within the chat thread, but you can have the result components show wherever you like by accessing the latest thread message's `renderedComponent` field:
+---
 
-```tsx
-const { thread } = useTambo();
-const latestComponent =
-  thread?.messages[thread.messages.length - 1]?.renderedComponent;
-
-return (
-  <div>
-    {latestComponent && (
-      <div className="my-custom-wrapper">{latestComponent}</div>
-    )}
-  </div>
-);
-```
-
-For more detailed documentation, visit [Tambo's official docs](https://docs.tambo.co).
+_(C) 2026 TAMBO_AI // ENC_DEPT_BETA_
