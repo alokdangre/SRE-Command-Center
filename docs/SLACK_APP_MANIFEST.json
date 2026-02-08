@@ -1,0 +1,40 @@
+{
+  "display_information": {
+    "name": "SRE Command Center",
+    "description": "AI-powered incident response companion",
+    "background_color": "#0B1220"
+  },
+  "features": {
+    "app_home": {
+      "home_tab_enabled": false,
+      "messages_tab_enabled": false,
+      "messages_tab_read_only_enabled": true
+    },
+    "bot_user": {
+      "display_name": "SRE Command Center",
+      "always_online": false
+    }
+  },
+  "oauth_config": {
+    "redirect_urls": [
+      "http://localhost:3000/auth/slack/callback",
+      "https://<YOUR_DOMAIN>/auth/slack/callback"
+    ],
+    "scopes": {
+      "bot": [
+        "channels:read",
+        "channels:history",
+        "groups:read",
+        "groups:history",
+        "users:read",
+        "chat:write"
+      ]
+    }
+  },
+  "settings": {
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "is_hosted": false,
+    "token_rotation_enabled": false
+  }
+}
