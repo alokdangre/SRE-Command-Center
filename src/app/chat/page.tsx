@@ -2,6 +2,8 @@
 
 import { MessageThreadFull } from "@/components/tambo/message-thread-full";
 import { useMcpServers } from "@/components/tambo/mcp-config-modal";
+import { TamboRuntimeContext } from "@/components/tambo/tambo-runtime-context";
+import { ThreadPersistence } from "@/components/tambo/thread-persistence";
 import { components, tools } from "@/lib/tambo";
 import { TamboProvider } from "@tambo-ai/react";
 
@@ -28,6 +30,8 @@ export default function Home() {
       mcpServers={mcpServers}
     >
       <div className="h-screen">
+        <ThreadPersistence />
+        <TamboRuntimeContext incidentId="general-chat" isChatOpen />
         <MessageThreadFull className="max-w-4xl mx-auto"/>
       </div>
     </TamboProvider>

@@ -101,7 +101,7 @@ export const MessageThreadFull = React.forwardRef<
       >
         <ScrollableMessageContainer className="p-4">
           <ThreadContent variant={variant}>
-            <ThreadContentMessages />
+            <ThreadContentMessages showStreamingIndicator={false} />
           </ThreadContent>
         </ScrollableMessageContainer>
 

@@ -9,6 +9,7 @@ import {
   ToolcallInfo,
   type messageVariants,
 } from "@/components/tambo/message";
+import { MessageGenerationStage } from "@/components/tambo/message-generation-stage";
 import { cn } from "@/lib/utils";
 import { type TamboThreadMessage, useTambo } from "@tambo-ai/react";
 import { type VariantProps } from "class-variance-authority";
@@ -108,7 +109,9 @@ ThreadContent.displayName = "ThreadContent";
  * Props for the ThreadContentMessages component.
  * Extends standard HTMLDivElement attributes.
  */
-export type ThreadContentMessagesProps = React.HTMLAttributes<HTMLDivElement>;
+export interface ThreadContentMessagesProps extends React.HTMLAttributes<HTMLDivElement> {
+  showStreamingIndicator?: boolean;
+}
 
 /**
  * Renders the list of messages in the thread.
@@ -124,12 +127,20 @@ export type ThreadContentMessagesProps = React.HTMLAttributes<HTMLDivElement>;
 const ThreadContentMessages = React.forwardRef<
   HTMLDivElement,
   ThreadContentMessagesProps
->(({ className, ...props }, ref) => {
-  const { messages, isGenerating, variant } = useThreadContentContext();
+>(({ className, showStreamingIndicator = true, ...props }, ref) => {
+  const { messages, isGenerating, generationStage, variant } =
+    useThreadContentContext();
 
   const filteredMessages = messages.filter(
     (message) => message.role !== "system" && !message.parentMessageId,
   );
+  const lastVisibleMessage = filteredMessages[filteredMessages.length - 1];
+  const shouldShowTypingIndicator =
+    showStreamingIndicator &&
+    isGenerating &&
+    (!lastVisibleMessage || lastVisibleMessage.role !== "assistant");
+  const shouldShowStageIndicator =
+    showStreamingIndicator && isGenerating && !!generationStage;
 
   return (
     <div
@@ -179,6 +190,29 @@ const ThreadContentMessages = React.forwardRef<
           </div>
         );
       })}
+
+      {(shouldShowTypingIndicator || shouldShowStageIndicator) && (
+        <div
+          className="flex w-full justify-start"
+          data-slot="thread-content-streaming-indicator"
+        >
+          <div className="mt-1 inline-flex flex-col gap-1 rounded-2xl border border-border/70 bg-container/40 px-3 py-2">
+            {shouldShowTypingIndicator && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-current animate-bounce [animation-delay:-0.2s]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-current animate-bounce [animation-delay:-0.1s]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-current animate-bounce" />
+                </div>
+                <span>Assistant is typing...</span>
+              </div>
+            )}
+            {shouldShowStageIndicator && (
+              <MessageGenerationStage className="p-0 text-[11px]" />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 });

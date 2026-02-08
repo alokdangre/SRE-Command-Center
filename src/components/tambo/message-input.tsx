@@ -12,6 +12,10 @@ import {
 } from "@/components/tambo/suggestions-tooltip";
 import { cn } from "@/lib/utils";
 import {
+  buildModelAdditionalContext,
+  readModelSelection,
+} from "@/lib/model-selection";
+import {
   useIsTamboTokenUpdating,
   useTamboThread,
   useTamboThreadInput,
@@ -337,6 +341,7 @@ interface MessageInputContextValue {
   submit: (options: {
     streamResponse?: boolean;
     resourceNames: Record<string, string>;
+    additionalContext?: Record<string, unknown>;
   }) => Promise<void>;
   handleSubmit: (e: React.FormEvent) => Promise<void>;
   isPending: boolean;
@@ -505,11 +510,13 @@ const MessageInputInternal = React.forwardRef<
       }
 
       const imageIdsAtSubmitTime = images.map((image) => image.id);
+      const modelSelection = readModelSelection();
 
       try {
         await submit({
           streamResponse: true,
           resourceNames: latestResourceNames,
+          additionalContext: buildModelAdditionalContext(modelSelection),
         });
         setValue("");
         // Clear only the images that were staged when submission started so
