@@ -38,12 +38,24 @@ export interface IntegrationConfig {
         enabled: boolean;
         clusterUrl?: string;
         token?: string;
+        defaultNamespace?: string;
+        allowedNamespaces?: string[];
+        caCert?: string;
+        skipTlsVerify?: boolean;
     };
     pagerduty: {
         enabled: boolean;
         apiKey?: string;
         serviceIds?: string[];
     };
+}
+
+function parseBooleanEnv(value: string | undefined): boolean | undefined {
+    if (value === undefined) return undefined;
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes", "on"].includes(normalized)) return true;
+    if (["0", "false", "no", "off"].includes(normalized)) return false;
+    return undefined;
 }
 
 /**
@@ -141,10 +153,27 @@ export async function getIntegrationConfig(): Promise<IntegrationConfig> {
                 enabled: true,
                 clusterUrl: k8sConfig.cluster_url,
                 token: k8sConfig.token,
+                defaultNamespace: k8sConfig.default_namespace,
+                allowedNamespaces: k8sConfig.namespaces,
+                caCert: k8sConfig.ca_cert,
+                skipTlsVerify: Boolean(k8sConfig.skip_tls_verify),
             };
         }
     } catch {
-        // No env var fallback for k8s in browser context
+        // Fall back to env vars
+        if (process.env.KUBERNETES_CLUSTER_URL && process.env.KUBERNETES_TOKEN) {
+            config.kubernetes = {
+                enabled: true,
+                clusterUrl: process.env.KUBERNETES_CLUSTER_URL,
+                token: process.env.KUBERNETES_TOKEN,
+                defaultNamespace: process.env.KUBERNETES_DEFAULT_NAMESPACE || "default",
+                allowedNamespaces: process.env.KUBERNETES_ALLOWED_NAMESPACES
+                    ? process.env.KUBERNETES_ALLOWED_NAMESPACES.split(",").map(ns => ns.trim()).filter(Boolean)
+                    : undefined,
+                caCert: process.env.KUBERNETES_CA_CERT || undefined,
+                skipTlsVerify: parseBooleanEnv(process.env.KUBERNETES_SKIP_TLS_VERIFY),
+            };
+        }
     }
 
     try {

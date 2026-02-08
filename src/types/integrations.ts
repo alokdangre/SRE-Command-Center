@@ -72,9 +72,11 @@ export interface KubernetesConfig {
     // Cluster info
     cluster_name: string;
     cluster_url: string;
+    default_namespace?: string;
     // Auth
     token?: string;
     ca_cert?: string;
+    skip_tls_verify?: boolean;
     // Namespaces to monitor
     namespaces?: string[];
 }

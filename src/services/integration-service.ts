@@ -4,7 +4,14 @@
  */
 
 import { createClient } from '@/lib/supabase/client';
-import type { IntegrationType, UserIntegration, GitHubConfig, PrometheusConfig } from '@/types/integrations';
+import { validateAndNormalizeKubernetesConfig } from '@/lib/integrations/kubernetes-security';
+import type {
+    IntegrationType,
+    UserIntegration,
+    GitHubConfig,
+    PrometheusConfig,
+    KubernetesConfig,
+} from '@/types/integrations';
 
 /**
  * Get all integrations for the current user
@@ -217,6 +224,61 @@ export async function verifyPrometheusIntegration(config: PrometheusConfig): Pro
 
         return { success: true };
     } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to connect' };
+    }
+}
+
+/**
+ * Verify Kubernetes integration by listing namespaces
+ */
+export async function verifyKubernetesIntegration(config: KubernetesConfig): Promise<{ success: boolean; error?: string }> {
+    try {
+        const validation = validateAndNormalizeKubernetesConfig(config);
+        if (!validation.success || !validation.config) {
+            return {
+                success: false,
+                error: validation.error || 'Kubernetes security validation failed',
+            };
+        }
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch(`${validation.config.clusterUrl}/api/v1/namespaces?limit=20`, {
+            headers: {
+                Authorization: `Bearer ${validation.config.token}`,
+                Accept: 'application/json',
+            },
+            signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+            return { success: false, error: `Kubernetes API error: ${response.status}` };
+        }
+
+        const data = await response.json();
+        if (!Array.isArray(data.items)) {
+            return { success: false, error: 'Unexpected Kubernetes response format' };
+        }
+
+        const responseNamespaces = data.items
+            .map((item: { metadata?: { name?: string } }) => item.metadata?.name?.toLowerCase())
+            .filter((namespace: string | undefined): namespace is string => Boolean(namespace));
+
+        const hasDefaultNamespace = responseNamespaces.includes(validation.config.defaultNamespace);
+        if (!hasDefaultNamespace) {
+            return {
+                success: false,
+                error: `Default namespace "${validation.config.defaultNamespace}" is not visible with this token.`,
+            };
+        }
+
+        return { success: true };
+    } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+            return { success: false, error: 'Kubernetes verification timed out after 10 seconds' };
+        }
         return { success: false, error: error instanceof Error ? error.message : 'Failed to connect' };
     }
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
     Settings,
+    Bot,
     Github,
     Activity,
     MessageSquare,
@@ -24,10 +25,19 @@ import {
     deleteIntegration,
     verifyGitHubIntegration,
     verifyPrometheusIntegration,
+    verifyKubernetesIntegration,
 } from "@/services/integration-service";
 import { INTEGRATION_INFO, type IntegrationType, type UserIntegration } from "@/types/integrations";
 import { UserNav } from "@/components/auth/user-nav";
 import { signInWithGitHub } from "@/app/auth/actions";
+import {
+    getDefaultModelSelection,
+    getProviderModels,
+    readModelSelection,
+    writeModelSelection,
+    type ModelProvider,
+    type ModelSelection,
+} from "@/lib/model-selection";
 
 const ICONS: Record<string, React.ElementType> = {
     github: Github,
@@ -41,9 +51,12 @@ export default function SettingsPage() {
     const [integrations, setIntegrations] = useState<UserIntegration[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeSetup, setActiveSetup] = useState<IntegrationType | null>(null);
+    const [modelSelection, setModelSelection] = useState<ModelSelection>(getDefaultModelSelection());
+    const [modelSaved, setModelSaved] = useState(false);
 
     useEffect(() => {
         loadIntegrations();
+        setModelSelection(readModelSelection());
     }, []);
 
     async function loadIntegrations() {
@@ -66,6 +79,28 @@ export default function SettingsPage() {
             lastVerified: integration?.last_verified_at,
         };
     }
+
+    function handleProviderChange(provider: ModelProvider) {
+        const providerModels = getProviderModels(provider);
+        setModelSelection({
+            provider,
+            model: providerModels[0] || "",
+        });
+        setModelSaved(false);
+    }
+
+    function handleModelChange(model: string) {
+        setModelSelection((prev) => ({ ...prev, model }));
+        setModelSaved(false);
+    }
+
+    function saveModelPreference() {
+        writeModelSelection(modelSelection);
+        setModelSaved(true);
+        setTimeout(() => setModelSaved(false), 2000);
+    }
+
+    const providerModels = getProviderModels(modelSelection.provider);
 
     return (
         <div className="min-h-screen bg-black text-white font-mono">
@@ -187,6 +222,65 @@ export default function SettingsPage() {
                     </div>
                 )}
 
+                {!loading && !activeSetup && (
+                    <div className="mt-8 border border-gray-800 rounded-lg p-6 bg-black/40">
+                        <div className="flex items-start gap-3 mb-4">
+                            <Bot className="w-5 h-5 text-cyan-400 mt-0.5" />
+                            <div>
+                                <h3 className="font-bold text-white">AI Model Selection</h3>
+                                <p className="text-xs text-gray-400">
+                                    Choose preferred provider/model for new chat requests. Preference is stored in your browser.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">
+                                    Provider
+                                </label>
+                                <select
+                                    value={modelSelection.provider}
+                                    onChange={(e) => handleProviderChange(e.target.value as ModelProvider)}
+                                    className="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none"
+                                >
+                                    <option value="openai">OpenAI</option>
+                                    <option value="anthropic">Anthropic</option>
+                                    <option value="google">Google</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">
+                                    Model
+                                </label>
+                                <select
+                                    value={modelSelection.model}
+                                    onChange={(e) => handleModelChange(e.target.value)}
+                                    className="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none"
+                                >
+                                    {providerModels.map((model) => (
+                                        <option key={model} value={model}>
+                                            {model}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="mt-4 flex items-center gap-3">
+                            <button
+                                onClick={saveModelPreference}
+                                className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded text-xs font-bold uppercase tracking-widest transition-colors"
+                            >
+                                Save Model Preference
+                            </button>
+                            {modelSaved && (
+                                <span className="text-xs text-green-400 flex items-center gap-1">
+                                    <Check className="w-3 h-3" /> Saved
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {/* Security Notice */}
                 <div className="mt-12 border border-gray-800 rounded-lg p-6 bg-black/40">
                     <div className="flex items-start gap-4">
@@ -230,6 +324,13 @@ function IntegrationSetup({
     const [prometheusPass, setPrometheusPass] = useState("");
     const [pagerdutyApiKey, setPagerdutyApiKey] = useState("");
     const [pagerdutyServices, setPagerdutyServices] = useState("");
+    const [kubernetesClusterName, setKubernetesClusterName] = useState("");
+    const [kubernetesClusterUrl, setKubernetesClusterUrl] = useState("");
+    const [kubernetesToken, setKubernetesToken] = useState("");
+    const [kubernetesCaCert, setKubernetesCaCert] = useState("");
+    const [kubernetesSkipTlsVerify, setKubernetesSkipTlsVerify] = useState(false);
+    const [kubernetesDefaultNamespace, setKubernetesDefaultNamespace] = useState("default");
+    const [kubernetesNamespaces, setKubernetesNamespaces] = useState("default");
 
     async function handleGitHubOAuth() {
         // Redirect to GitHub OAuth via Supabase
@@ -328,6 +429,47 @@ function IntegrationSetup({
             };
 
             await saveIntegration('pagerduty', config);
+            setSuccess(true);
+            onSave();
+            setTimeout(onClose, 1500);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to save');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function handleSaveKubernetes() {
+        setSaving(true);
+        setError(null);
+
+        try {
+            const namespaceList = kubernetesNamespaces
+                .split(',')
+                .map(ns => ns.trim())
+                .filter(Boolean);
+
+            const config = {
+                type: 'service_account' as const,
+                cluster_name: kubernetesClusterName || 'Default Cluster',
+                cluster_url: kubernetesClusterUrl,
+                token: kubernetesToken,
+                ca_cert: kubernetesCaCert || undefined,
+                skip_tls_verify: kubernetesSkipTlsVerify,
+                default_namespace: kubernetesDefaultNamespace || namespaceList[0] || 'default',
+                namespaces: namespaceList.length > 0 ? namespaceList : ['default'],
+            };
+
+            // Verify first
+            setVerifying(true);
+            const verification = await verifyKubernetesIntegration(config);
+            setVerifying(false);
+
+            if (!verification.success) {
+                throw new Error(verification.error);
+            }
+
+            await saveIntegration('kubernetes', config);
             setSuccess(true);
             onSave();
             setTimeout(onClose, 1500);
@@ -535,13 +677,125 @@ function IntegrationSetup({
                         </div>
                     )}
 
-                    {/* Slack, Kubernetes - Coming Soon */}
-                    {(type === 'slack' || type === 'kubernetes') && (
-                        <div className="text-center py-8">
-                            <div className="text-4xl mb-4">🚧</div>
-                            <h3 className="text-lg font-bold text-white mb-2">Coming Soon</h3>
-                            <p className="text-sm text-gray-400">
-                                {info.name} integration is under development.
+                    {/* Kubernetes Setup */}
+                    {type === 'kubernetes' && (
+                        <div className="space-y-4">
+                            <p className="text-xs text-gray-400 mb-4">
+                                Use a Kubernetes API endpoint and service account token with least-privilege
+                                permissions for deployments/pods in approved namespaces.
+                            </p>
+                            <div>
+                                <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">
+                                    Cluster Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={kubernetesClusterName}
+                                    onChange={(e) => setKubernetesClusterName(e.target.value)}
+                                    placeholder="Production Cluster"
+                                    className="w-full bg-black border border-gray-700 rounded px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">
+                                    Kubernetes API URL
+                                </label>
+                                <input
+                                    type="text"
+                                    value={kubernetesClusterUrl}
+                                    onChange={(e) => setKubernetesClusterUrl(e.target.value)}
+                                    placeholder="https://kubernetes.default.svc"
+                                    className="w-full bg-black border border-gray-700 rounded px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">
+                                    Service Account Token
+                                </label>
+                                <input
+                                    type="password"
+                                    value={kubernetesToken}
+                                    onChange={(e) => setKubernetesToken(e.target.value)}
+                                    placeholder="eyJhbGciOiJSUzI1NiIsImtpZCI6..."
+                                    className="w-full bg-black border border-gray-700 rounded px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">
+                                    CA Certificate (optional)
+                                </label>
+                                <textarea
+                                    value={kubernetesCaCert}
+                                    onChange={(e) => setKubernetesCaCert(e.target.value)}
+                                    placeholder="-----BEGIN CERTIFICATE-----..."
+                                    rows={4}
+                                    className="w-full bg-black border border-gray-700 rounded px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none"
+                                />
+                                <p className="text-xs text-gray-500 mt-2">
+                                    Paste the PEM-encoded cluster CA certificate for stricter TLS validation.
+                                </p>
+                            </div>
+                            <label className="flex items-start gap-3 p-3 border border-amber-500/30 rounded bg-amber-500/5">
+                                <input
+                                    type="checkbox"
+                                    checked={kubernetesSkipTlsVerify}
+                                    onChange={(e) => setKubernetesSkipTlsVerify(e.target.checked)}
+                                    className="mt-0.5 w-4 h-4 accent-amber-500"
+                                />
+                                <span className="text-xs text-amber-300">
+                                    Allow insecure TLS verification (localhost dev only). This is blocked for non-local clusters.
+                                </span>
+                            </label>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">
+                                        Default Namespace
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={kubernetesDefaultNamespace}
+                                        onChange={(e) => setKubernetesDefaultNamespace(e.target.value)}
+                                        placeholder="default"
+                                        className="w-full bg-black border border-gray-700 rounded px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">
+                                        Allowed Namespaces
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={kubernetesNamespaces}
+                                        onChange={(e) => setKubernetesNamespaces(e.target.value)}
+                                        placeholder="default, production"
+                                        className="w-full bg-black border border-gray-700 rounded px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                                Live remediation is disabled by default. Set <code>ENABLE_K8S_REMEDIATION=true</code>
+                                {" "}and optional <code>ENABLE_K8S_ROLLBACK=true</code> to allow action execution.
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Slack - Coming Soon */}
+                    {type === 'slack' && (
+                        <div className="space-y-4">
+                            <p className="text-xs text-gray-400 mb-2">
+                                Install and authorize your Slack app to enable incident channel context.
+                                This stores a workspace token scoped to your account.
+                            </p>
+                            <a
+                                href="/auth/slack/start"
+                                className="flex items-center justify-center gap-2 w-full py-3 bg-[#4A154B] hover:bg-[#5f1d60] text-white rounded font-bold text-sm transition-colors"
+                            >
+                                <MessageSquare className="w-4 h-4" />
+                                Connect with Slack
+                                <ExternalLink className="w-3 h-3 ml-1" />
+                            </a>
+                            <p className="text-xs text-gray-500">
+                                Required server env vars: <code>SLACK_CLIENT_ID</code> and <code>SLACK_CLIENT_SECRET</code>.
                             </p>
                         </div>
                     )}
@@ -555,7 +809,7 @@ function IntegrationSetup({
                     )}
 
                     {/* Action Buttons */}
-                    {(type === 'github' || type === 'prometheus' || type === 'pagerduty') && (
+                    {(type === 'github' || type === 'prometheus' || type === 'pagerduty' || type === 'kubernetes') && (
                         <div className="mt-6 flex gap-3">
                             <button
                                 onClick={onClose}
@@ -569,13 +823,16 @@ function IntegrationSetup({
                                         ? handleSaveGitHub
                                         : type === 'prometheus'
                                             ? handleSavePrometheus
-                                            : handleSavePagerDuty
+                                            : type === 'pagerduty'
+                                                ? handleSavePagerDuty
+                                                : handleSaveKubernetes
                                 }
                                 disabled={
                                     saving ||
                                     (type === 'github' && !githubPat) ||
                                     (type === 'prometheus' && !prometheusUrl) ||
-                                    (type === 'pagerduty' && !pagerdutyApiKey)
+                                    (type === 'pagerduty' && !pagerdutyApiKey) ||
+                                    (type === 'kubernetes' && (!kubernetesClusterUrl || !kubernetesToken))
                                 }
                                 className="flex-1 py-3 bg-cyan-500 hover:bg-cyan-400 text-black rounded font-bold text-sm uppercase tracking-wider transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
