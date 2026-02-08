@@ -25,7 +25,7 @@
 
 **Status: IN PROGRESS**
 
-The integrations are built, but the checklist shows tools as "Mock" - update checklist and verify integration paths.
+The integrations are built and runtime tools now run in live-data mode. Keep checklist and integration verification in sync.
 
 | Tool                      | Target Integration | Status                                |
 | ------------------------- | ------------------ | ------------------------------------- |
@@ -36,11 +36,11 @@ The integrations are built, but the checklist shows tools as "Mock" - update che
 | `analyzeRecentCommits`    | GitHub             | ✅ Connected (needs checklist update) |
 | `getCurrentIncident`      | PagerDuty          | ✅ Connected                          |
 | `getIncidentTimelineData` | PagerDuty          | ✅ Connected                          |
-| `getRemediationOptions`   | Kubernetes         | ✅ Connected (mock fallback)          |
+| `getRemediationOptions`   | Kubernetes         | ✅ Connected (live only)              |
 | `executeRemediation`      | Kubernetes         | ✅ Connected (guarded execution)      |
-| `getSlackContext`         | Slack              | ✅ Connected (mock fallback)          |
-| `getRootCauseAnalysis`    | AI Enhanced        | ✅ Connected (multi-source fallback) |
-| `getAnomalyHeatmapData`   | ML/Prometheus      | ✅ Connected (Prometheus + fallback) |
+| `getSlackContext`         | Slack              | ✅ Connected (live only)              |
+| `getRootCauseAnalysis`    | AI Enhanced        | ✅ Connected (multi-source live data) |
+| `getAnomalyHeatmapData`   | ML/Prometheus      | ✅ Connected (Prometheus live data)   |
 
 ---
 

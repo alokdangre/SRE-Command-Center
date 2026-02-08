@@ -84,22 +84,22 @@ Functions that execute in the browser.
 
 ## ✅ Backend Tools (Server-Side)
 
-Functions executed server-side. Now connected to real integrations with mock fallback.
+Functions executed server-side. Connected to real integrations only (no mock fallback in runtime tools).
 
 | Tool                      | Description              | Status       | Data Source                  |
 | ------------------------- | ------------------------ | ------------ | ---------------------------- |
-| `getSystemOverview`       | High-level system health | ✅ Connected | Prometheus (mock fallback)   |
-| `getServiceStatus`        | Detailed service metrics | ✅ Connected | Prometheus (mock fallback)   |
-| `getActiveAlerts`         | List firing alerts       | ✅ Connected | Alertmanager (mock fallback) |
-| `getHealthMetrics`        | CPU, memory, etc.        | ✅ Connected | Prometheus (mock fallback)   |
-| `analyzeRecentCommits`    | Git commit analysis      | ✅ Connected | GitHub API (mock fallback)   |
-| `getCurrentIncident`      | Active incident details  | ✅ Connected | PagerDuty (mock fallback)    |
-| `getIncidentTimelineData` | Timeline data            | ✅ Connected | PagerDuty (mock fallback)    |
-| `getRemediationOptions`   | Available fix actions    | ✅ Connected | Kubernetes API (mock fallback) |
-| `executeRemediation`      | Trigger a fix            | ✅ Connected | Kubernetes API (guarded + mock fallback) |
-| `getSlackContext`         | Team discussions         | ✅ Connected | Slack API (mock fallback)    |
-| `getRootCauseAnalysis`    | AI root cause            | ✅ Connected | Multi-source aggregation (with fallback) |
-| `getAnomalyHeatmapData`   | Heatmap data             | ✅ Connected | Prometheus range scoring (mock fallback) |
+| `getSystemOverview`       | High-level system health | ✅ Connected | Prometheus (live only)       |
+| `getServiceStatus`        | Detailed service metrics | ✅ Connected | Prometheus (live only)       |
+| `getActiveAlerts`         | List firing alerts       | ✅ Connected | Alertmanager (live only)     |
+| `getHealthMetrics`        | CPU, memory, etc.        | ✅ Connected | Prometheus (live only)       |
+| `analyzeRecentCommits`    | Git commit analysis      | ✅ Connected | GitHub API (live only)       |
+| `getCurrentIncident`      | Active incident details  | ✅ Connected | PagerDuty (live only)        |
+| `getIncidentTimelineData` | Timeline data            | ✅ Connected | PagerDuty + Prometheus (live only) |
+| `getRemediationOptions`   | Available fix actions    | ✅ Connected | Kubernetes API (live only)   |
+| `executeRemediation`      | Trigger a fix            | ✅ Connected | Kubernetes API (guarded live actions) |
+| `getSlackContext`         | Team discussions         | ✅ Connected | Slack API (live only)        |
+| `getRootCauseAnalysis`    | AI root cause            | ✅ Connected | Multi-source live aggregation |
+| `getAnomalyHeatmapData`   | Heatmap data             | ✅ Connected | Prometheus range scoring (live only) |
 | `getIntegrations`         | Integration status       | ✅ Connected | Supabase                     |
 
 ### Remaining Integration Priority
@@ -111,7 +111,7 @@ Functions executed server-side. Now connected to real integrations with mock fal
 ## ✅ External Integrations
 
 Integrations are configured through the **Settings > Integrations** page in the app UI.
-Credentials are stored securely in Supabase (per-user). Falls back to mock data when not configured.
+Credentials are stored securely in Supabase (per-user). If an integration is not configured, tools return explicit integration errors instead of mock data.
 
 | Integration | Purpose             | Status  | Configuration                       |
 | ----------- | ------------------- | ------- | ----------------------------------- |
@@ -261,9 +261,9 @@ export function TamboLayout({ children }: { children: React.ReactNode }) {
 
 ### Phase 2: Real Data (Next)
 
-- [ ] Connect Prometheus via custom MCP
-- [ ] Connect GitHub via Tambo dashboard
-- [ ] Replace mock data in tools
+- [x] Connect Prometheus via custom MCP/integration layer
+- [x] Connect GitHub via integration settings
+- [x] Remove runtime mock fallbacks from SRE tools
 
 ### Phase 3: Advanced Features (Future)
 

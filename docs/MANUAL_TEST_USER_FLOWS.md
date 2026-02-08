@@ -24,7 +24,7 @@
    - Kubernetes cluster URL + service account token
 
 Notes:
-- If real integration is not configured, tests still pass when response clearly falls back to mock data.
+- If an integration is not configured, tools must return empty/live-safe responses with explicit integration errors (no mock data).
 - For tool tests, if AI does not call a tool on first try, repeat prompt and explicitly say `Use tool <tool_name>`.
 
 ---
@@ -65,7 +65,7 @@ Steps:
 
 Expected:
 - GitHub shows `Connected`.
-- Tool returns commits (real or mock fallback).
+- Tool returns real commits only from configured repositories.
 
 ### INT-02 Prometheus Integration
 Route: `/settings`
@@ -106,7 +106,7 @@ Steps:
 
 Expected:
 - Slack shows `Connected`.
-- Context is returned (real or fallback if workspace has no data).
+- Context is returned from live Slack data, or a clear integration/data error is returned.
 
 ### INT-05 Kubernetes Integration + Security Hardening
 Route: `/settings`
