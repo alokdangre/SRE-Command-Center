@@ -1,21 +1,9 @@
 /**
  * SRE Tools for Tambo AI
  * These functions are called by the AI to analyze incidents and suggest remediations
- * 
- * Uses real integrations when configured, falls back to mock data otherwise.
+ *
+ * All responses are based on live integration data only.
  */
-
-import {
-    mockServices,
-    mockAlerts,
-    mockIncident,
-    mockRecentCommits,
-    mockHealthMetrics,
-    mockRemediationActions,
-    mockSlackMessages,
-    mockRootCauseAnalysis,
-    getSystemStatus,
-} from './mock-data';
 
 import {
     getIntegrationConfig,
@@ -36,6 +24,64 @@ import {
 } from '@/lib/integrations';
 import type { RemediationAction } from '@/types/sre';
 
+type ToolDataSource =
+    | 'prometheus'
+    | 'github'
+    | 'pagerduty'
+    | 'slack'
+    | 'kubernetes'
+    | 'mixed'
+    | 'unavailable';
+
+const INTEGRATION_HINT = {
+    prometheus: 'Prometheus is not configured. Connect it in Settings > Integrations to enable live metrics and alerts.',
+    github: 'GitHub is not configured with a repository. Connect GitHub and set at least one owner/repo in Settings.',
+    pagerduty: 'PagerDuty is not configured. Connect it in Settings > Integrations to enable live incident context.',
+    slack: 'Slack is not configured. Connect it in Settings > Integrations to enable team context.',
+    kubernetes: 'Kubernetes is not configured. Connect it in Settings > Integrations to enable remediation actions.',
+} as const;
+
+function normalizeSeverity(value: string): 'critical' | 'warning' | 'info' {
+    if (value === 'critical' || value === 'warning' || value === 'info') {
+        return value;
+    }
+    const lower = value.toLowerCase();
+    if (lower === 'high') return 'critical';
+    if (lower === 'medium' || lower === 'low') return 'warning';
+    return 'info';
+}
+
+function mapPrometheusStateToAlertStatus(
+    state: 'firing' | 'pending' | 'inactive'
+): 'firing' | 'acknowledged' | 'resolved' {
+    if (state === 'firing') return 'firing';
+    if (state === 'pending') return 'acknowledged';
+    return 'resolved';
+}
+
+function mapPagerDutyStatusToIncidentStatus(
+    status: 'triggered' | 'acknowledged' | 'resolved'
+): 'investigating' | 'identified' | 'monitoring' | 'resolved' {
+    if (status === 'triggered') return 'investigating';
+    if (status === 'acknowledged') return 'monitoring';
+    return 'resolved';
+}
+
+function mapPagerDutyUrgencyToSeverity(urgency: 'high' | 'low'): 'high' | 'low' {
+    return urgency === 'high' ? 'high' : 'low';
+}
+
+function mapPagerDutyTimelineType(
+    type: string
+): 'alert' | 'action' | 'note' | 'resolution' {
+    if (type === 'trigger') return 'alert';
+    if (type === 'acknowledge' || type === 'assign' || type === 'delegate' || type === 'escalate') {
+        return 'action';
+    }
+    if (type === 'resolve') return 'resolution';
+    return 'note';
+}
+
 /**
  * Get the current system status overview
  */
@@ -43,46 +89,55 @@ export async function getSystemOverview() {
     const config = await getIntegrationConfig();
     const integrations = await getIntegrationStatus();
 
-    // Try to get real data if Prometheus is configured
-    if (config.prometheus.enabled) {
-        const { services, error } = await getServiceHealth();
-
-        if (!error && services.length > 0) {
-            const healthyServices = services.filter(s => s.status === 'healthy').length;
-            const degradedServices = services.filter(s => s.status === 'degraded').length;
-            const criticalServices = services.filter(s => s.status === 'critical').length;
-
-            // Get alerts
-            const { alerts } = await fetchPrometheusAlerts();
-
-            return {
-                overallStatus: criticalServices > 0 ? 'critical' : degradedServices > 0 ? 'degraded' : 'healthy',
-                totalServices: services.length,
-                healthyServices,
-                degradedServices,
-                criticalServices,
-                activeAlerts: alerts.filter(a => a.state === 'firing').length,
-                activeIncidents: alerts.filter(a => a.state === 'firing' && a.severity === 'critical').length,
-                lastUpdated: new Date().toISOString(),
-                dataSource: 'prometheus',
-                integrations,
-            };
-        }
+    if (!config.prometheus.enabled) {
+        return {
+            overallStatus: 'degraded',
+            totalServices: 0,
+            healthyServices: 0,
+            degradedServices: 0,
+            criticalServices: 0,
+            activeAlerts: 0,
+            activeIncidents: 0,
+            lastUpdated: new Date().toISOString(),
+            dataSource: 'unavailable' as ToolDataSource,
+            integrations,
+            error: INTEGRATION_HINT.prometheus,
+        };
     }
 
-    // Fall back to mock data
-    const status = getSystemStatus();
+    const [{ services, error: serviceError }, { alerts, error: alertError }] = await Promise.all([
+        getServiceHealth(),
+        fetchPrometheusAlerts(),
+    ]);
+
+    const healthyServices = services.filter(s => s.status === 'healthy').length;
+    const degradedServices = services.filter(s => s.status === 'degraded').length;
+    const criticalServices = services.filter(s => s.status === 'critical').length;
+    const activeAlerts = alerts.filter(a => a.state === 'firing').length;
+    const activeIncidents = alerts.filter(
+        a => a.state === 'firing' && normalizeSeverity(a.severity) === 'critical'
+    ).length;
+
+    const liveError = serviceError || alertError;
+    const overallStatus =
+        criticalServices > 0 ? 'outage' :
+            degradedServices > 0 ? 'degraded' :
+                services.length > 0 ? 'operational' : 'degraded';
+
     return {
-        overallStatus: status.overall,
-        totalServices: status.services.length,
-        healthyServices: status.services.filter(s => s.status === 'healthy').length,
-        degradedServices: status.services.filter(s => s.status === 'degraded').length,
-        criticalServices: status.services.filter(s => s.status === 'critical').length,
-        activeAlerts: status.activeAlerts,
-        activeIncidents: status.activeIncidents,
-        lastUpdated: status.lastUpdated.toISOString(),
-        dataSource: 'mock',
+        overallStatus,
+        totalServices: services.length,
+        healthyServices,
+        degradedServices,
+        criticalServices,
+        activeAlerts,
+        activeIncidents,
+        lastUpdated: new Date().toISOString(),
+        dataSource: 'prometheus' as ToolDataSource,
         integrations,
+        error:
+            liveError ||
+            (services.length === 0 ? 'Prometheus returned no service metrics for the configured queries.' : undefined),
     };
 }
 
@@ -92,42 +147,28 @@ export async function getSystemOverview() {
 export async function getServiceStatus(params: { serviceName?: string }) {
     const config = await getIntegrationConfig();
 
-    // Try Prometheus first
-    if (config.prometheus.enabled) {
-        const { services, error } = await getServiceHealth(params.serviceName);
-
-        if (!error && services.length > 0) {
-            return {
-                services: services.map(s => ({
-                    name: s.name,
-                    status: s.status,
-                    latency: `${Math.round(s.latencyP99)}ms (P99)`,
-                    errorRate: `${s.errorRate.toFixed(2)}%`,
-                    requestRate: `${Math.round(s.requestRate)}/s`,
-                    uptime: s.uptime === 1 ? '100%' : '0%',
-                })),
-                dataSource: 'prometheus',
-            };
-        }
-    }
-
-    // Fall back to mock data
-    if (params.serviceName) {
-        const service = mockServices.find(
-            s => s.name.toLowerCase().includes(params.serviceName!.toLowerCase())
-        );
+    if (!config.prometheus.enabled) {
         return {
-            services: service ? [service] : [],
-            dataSource: 'mock',
+            services: [],
+            dataSource: 'unavailable' as ToolDataSource,
+            error: INTEGRATION_HINT.prometheus,
         };
     }
 
+    const { services, error } = await getServiceHealth(params.serviceName);
+
     return {
-        services: mockServices.map(s => ({
-            ...s,
-            lastDeployment: s.lastDeployment?.toISOString(),
+        services: services.map((s) => ({
+            id: s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            name: s.name,
+            status: s.status,
+            uptime: Math.round(s.uptime * 10000) / 100,
+            latency: Math.round(s.latencyP99),
+            errorRate: Math.round(s.errorRate * 100) / 100,
+            requestsPerSecond: Math.round(s.requestRate),
         })),
-        dataSource: 'mock',
+        dataSource: 'prometheus' as ToolDataSource,
+        error: error || (services.length === 0 ? 'No matching services were returned by Prometheus.' : undefined),
     };
 }
 
@@ -140,57 +181,42 @@ export async function getActiveAlerts(params: {
 }) {
     const config = await getIntegrationConfig();
 
-    // Try Prometheus/Alertmanager first
-    if (config.prometheus.enabled) {
-        const { alerts, error } = await fetchPrometheusAlerts();
-
-        if (!error && alerts.length > 0) {
-            let filtered = alerts.filter(a => a.state === 'firing');
-
-            if (params.severity) {
-                filtered = filtered.filter(a => a.severity === params.severity);
-            }
-
-            if (params.service) {
-                filtered = filtered.filter(a =>
-                    a.labels.service?.toLowerCase().includes(params.service!.toLowerCase()) ||
-                    a.labels.job?.toLowerCase().includes(params.service!.toLowerCase())
-                );
-            }
-
-            return {
-                alerts: filtered.map(a => ({
-                    id: `${a.alertname}-${a.activeAt}`,
-                    name: a.alertname,
-                    severity: a.severity,
-                    service: a.labels.service || a.labels.job || 'unknown',
-                    message: a.annotations.summary || a.annotations.description || a.alertname,
-                    timestamp: a.activeAt,
-                })),
-                dataSource: 'prometheus',
-            };
-        }
+    if (!config.prometheus.enabled) {
+        return {
+            alerts: [],
+            dataSource: 'unavailable' as ToolDataSource,
+            error: INTEGRATION_HINT.prometheus,
+        };
     }
 
-    // Fall back to mock data
-    let alerts = mockAlerts;
+    const { alerts, error } = await fetchPrometheusAlerts();
+    let filtered = alerts.filter(a => a.state === 'firing');
 
     if (params.severity) {
-        alerts = alerts.filter(a => a.severity === params.severity);
+        filtered = filtered.filter(a => normalizeSeverity(a.severity) === params.severity);
     }
 
     if (params.service) {
-        alerts = alerts.filter(a =>
-            a.service.toLowerCase().includes(params.service!.toLowerCase())
+        filtered = filtered.filter(a =>
+            a.labels.service?.toLowerCase().includes(params.service!.toLowerCase()) ||
+            a.labels.job?.toLowerCase().includes(params.service!.toLowerCase())
         );
     }
 
     return {
-        alerts: alerts.map(a => ({
-            ...a,
-            timestamp: a.timestamp.toISOString(),
+        alerts: filtered.map(a => ({
+            id: `${a.alertname}-${a.activeAt}`,
+            title: a.annotations.summary || a.annotations.description || a.alertname,
+            name: a.alertname,
+            severity: normalizeSeverity(a.severity),
+            service: a.labels.service || a.labels.job || 'unknown',
+            message: a.annotations.summary || a.annotations.description || a.alertname,
+            description: a.annotations.description || a.annotations.summary || a.alertname,
+            timestamp: a.activeAt,
+            status: mapPrometheusStateToAlertStatus(a.state),
         })),
-        dataSource: 'mock',
+        dataSource: 'prometheus' as ToolDataSource,
+        error,
     };
 }
 
@@ -200,55 +226,96 @@ export async function getActiveAlerts(params: {
 export async function getCurrentIncident() {
     const config = await getIntegrationConfig();
 
-    // Try PagerDuty first
-    if (config.pagerduty.enabled) {
-        const { incidents, error } = await getPagerDutyIncidents({
-            statuses: ['triggered', 'acknowledged'],
-            limit: 1,
-        });
-
-        if (!error && incidents.length > 0) {
-            const incident = incidents[0];
-
-            // Get timeline for this incident
-            const { timeline } = await getPagerDutyIncidentTimeline(incident.id);
-
-            return {
-                id: incident.id,
-                number: incident.incidentNumber,
-                title: incident.title,
-                description: incident.description,
-                status: incident.status,
-                severity: incident.urgency === 'high' ? 'critical' : 'warning',
-                service: incident.service.name,
-                assignees: incident.assignees.map(a => a.name),
-                startTime: incident.createdAt,
-                acknowledgedTime: incident.acknowledgedAt,
-                endTime: incident.resolvedAt,
-                timeline: timeline.map(e => ({
-                    type: e.type,
-                    description: e.message,
-                    timestamp: e.timestamp,
-                    author: e.agent?.name || 'System',
-                })),
-                duration: Math.round((Date.now() - new Date(incident.createdAt).getTime()) / 60000),
-                url: incident.htmlUrl,
-                dataSource: 'pagerduty',
-            };
-        }
+    if (!config.pagerduty.enabled) {
+        return {
+            id: 'none',
+            number: 0,
+            title: 'No active incident',
+            description: INTEGRATION_HINT.pagerduty,
+            status: 'resolved',
+            severity: 'low',
+            service: 'unavailable',
+            assignees: [],
+            startTime: new Date().toISOString(),
+            acknowledgedTime: undefined,
+            endTime: new Date().toISOString(),
+            timeline: [],
+            duration: 0,
+            dataSource: 'unavailable' as ToolDataSource,
+            error: INTEGRATION_HINT.pagerduty,
+        };
     }
 
-    // Fall back to mock data
+    const { incidents, error } = await getPagerDutyIncidents({
+        statuses: ['triggered', 'acknowledged'],
+        limit: 1,
+    });
+
+    if (error) {
+        return {
+            id: 'none',
+            number: 0,
+            title: 'No active incident',
+            description: error,
+            status: 'resolved',
+            severity: 'low',
+            service: 'unavailable',
+            assignees: [],
+            startTime: new Date().toISOString(),
+            acknowledgedTime: undefined,
+            endTime: new Date().toISOString(),
+            timeline: [],
+            duration: 0,
+            dataSource: 'pagerduty' as ToolDataSource,
+            error,
+        };
+    }
+
+    if (incidents.length === 0) {
+        return {
+            id: 'none',
+            number: 0,
+            title: 'No active PagerDuty incidents',
+            description: 'PagerDuty is connected but there are currently no triggered or acknowledged incidents.',
+            status: 'resolved',
+            severity: 'low',
+            service: 'none',
+            assignees: [],
+            startTime: new Date().toISOString(),
+            acknowledgedTime: undefined,
+            endTime: new Date().toISOString(),
+            timeline: [],
+            duration: 0,
+            dataSource: 'pagerduty' as ToolDataSource,
+        };
+    }
+
+    const incident = incidents[0];
+    const { timeline, error: timelineError } = await getPagerDutyIncidentTimeline(incident.id);
+
     return {
-        ...mockIncident,
-        startTime: mockIncident.startTime.toISOString(),
-        endTime: mockIncident.endTime?.toISOString(),
-        timeline: mockIncident.timeline.map(e => ({
-            ...e,
-            timestamp: e.timestamp.toISOString(),
+        id: incident.id,
+        number: incident.incidentNumber,
+        title: incident.title,
+        description: incident.description,
+        status: mapPagerDutyStatusToIncidentStatus(incident.status),
+        severity: mapPagerDutyUrgencyToSeverity(incident.urgency),
+        service: incident.service.name,
+        affectedServices: [incident.service.name],
+        assignees: incident.assignees.map(a => a.name),
+        startTime: incident.createdAt,
+        acknowledgedTime: incident.acknowledgedAt,
+        endTime: incident.resolvedAt,
+        timeline: timeline.map(e => ({
+            type: mapPagerDutyTimelineType(e.type),
+            description: e.message,
+            timestamp: e.timestamp,
+            author: e.agent?.name || 'System',
         })),
-        duration: Math.round((Date.now() - mockIncident.startTime.getTime()) / 60000),
-        dataSource: 'mock',
+        duration: Math.max(0, Math.round((Date.now() - new Date(incident.createdAt).getTime()) / 60000)),
+        url: incident.htmlUrl,
+        dataSource: 'pagerduty' as ToolDataSource,
+        error: timelineError,
     };
 }
 
@@ -261,50 +328,42 @@ export async function analyzeRecentCommits(params: {
 }) {
     const config = await getIntegrationConfig();
 
-    // Try GitHub first
-    if (config.github.enabled) {
-        const result = await analyzeGitHubCommits({
-            service: params.service,
-            hoursBack: params.hoursBack || 24,
-        });
-
-        if (!result.error) {
-            return {
-                commits: result.commits.map(c => ({
-                    sha: c.sha,
-                    message: c.message,
-                    author: c.author,
-                    timestamp: c.timestamp,
-                    files: c.files,
-                    additions: c.additions,
-                    deletions: c.deletions,
-                    isBreakingChange: c.isBreakingChange,
-                    affectsConfiguration: c.affectsConfiguration,
-                    isLargeChange: c.isLargeChange,
-                    riskLevel: c.riskLevel,
-                    url: c.url,
-                })),
-                suspiciousCommits: result.commits.filter(c => c.riskLevel !== 'low'),
-                summary: result.summary,
-                dataSource: 'github',
-            };
-        }
+    if (!config.github.enabled) {
+        return {
+            commits: [],
+            suspiciousCommits: [],
+            summary: INTEGRATION_HINT.github,
+            dataSource: 'unavailable' as ToolDataSource,
+            error: INTEGRATION_HINT.github,
+        };
     }
 
-    // Fall back to mock data
-    const commits = mockRecentCommits.map(c => ({
-        ...c,
-        timestamp: c.timestamp.toISOString(),
-        isBreakingChange: c.message.includes('BREAKING CHANGE'),
-        affectsConfiguration: c.files.some(f => f.includes('config') || f.includes('.yaml')),
-        isLargeChange: c.additions + c.deletions > 200,
-    }));
+    const result = await analyzeGitHubCommits({
+        service: params.service,
+        hoursBack: params.hoursBack || 24,
+    });
+
+    const suspiciousCommits = result.commits.filter(c => c.riskLevel !== 'low');
 
     return {
-        commits,
-        suspiciousCommits: commits.filter(c => c.isBreakingChange || c.isLargeChange),
-        summary: `Found ${commits.length} recent commits, ${commits.filter(c => c.isBreakingChange).length} with breaking changes`,
-        dataSource: 'mock',
+        commits: result.commits.map(c => ({
+            sha: c.sha,
+            message: c.message,
+            author: c.author,
+            timestamp: c.timestamp,
+            files: c.files,
+            additions: c.additions,
+            deletions: c.deletions,
+            isBreakingChange: c.isBreakingChange,
+            affectsConfiguration: c.affectsConfiguration,
+            isLargeChange: c.isLargeChange,
+            riskLevel: c.riskLevel,
+            url: c.url,
+        })),
+        suspiciousCommits,
+        summary: result.summary,
+        dataSource: 'github' as ToolDataSource,
+        error: result.error,
     };
 }
 
@@ -314,43 +373,23 @@ export async function analyzeRecentCommits(params: {
 export async function getHealthMetrics(params: { metricName?: string }) {
     const config = await getIntegrationConfig();
 
-    // Try Prometheus first
-    if (config.prometheus.enabled) {
-        const { metrics, error } = await getPrometheusHealthMetrics({
-            metricName: params.metricName,
-        });
-
-        if (!error && metrics.length > 0) {
-            return {
-                metrics,
-                dataSource: 'prometheus',
-            };
-        }
+    if (!config.prometheus.enabled) {
+        return {
+            metrics: [],
+            dataSource: 'unavailable' as ToolDataSource,
+            error: INTEGRATION_HINT.prometheus,
+        };
     }
 
-    // Fall back to mock data
-    let metrics = mockHealthMetrics;
-
-    if (params.metricName) {
-        metrics = metrics.filter(m =>
-            m.name.toLowerCase().includes(params.metricName!.toLowerCase())
-        );
-    }
+    const { metrics, error } = await getPrometheusHealthMetrics({
+        metricName: params.metricName,
+    });
 
     return {
-        metrics: metrics.map(m => ({
-            ...m,
-            status: getMetricStatus(m),
-        })),
-        dataSource: 'mock',
+        metrics,
+        dataSource: 'prometheus' as ToolDataSource,
+        error,
     };
-}
-
-function getMetricStatus(metric: typeof mockHealthMetrics[0]): 'ok' | 'warning' | 'critical' {
-    if (!metric.threshold) return 'ok';
-    if (metric.value >= metric.threshold.critical) return 'critical';
-    if (metric.value >= metric.threshold.warning) return 'warning';
-    return 'ok';
 }
 
 type KubernetesRemediationOperation = 'restart' | 'scale' | 'rollback';
@@ -418,214 +457,194 @@ function isNamespaceAllowed(namespace: string, allowedNamespaces?: string[]) {
 export async function getRemediationOptions(params: { riskLevel?: 'low' | 'medium' | 'high' }) {
     const config = await getIntegrationConfig();
 
-    if (config.kubernetes.enabled) {
-        const namespace =
-            config.kubernetes.defaultNamespace ||
-            config.kubernetes.allowedNamespaces?.[0] ||
-            'default';
-
-        const [deploymentResult, podResult] = await Promise.all([
-            getDeployments(namespace),
-            getPodStatus(namespace),
-        ]);
-
-        if (!deploymentResult.error && deploymentResult.deployments.length > 0) {
-            const remediationEnabled = process.env.ENABLE_K8S_REMEDIATION === 'true';
-            const rollbackEnabled = process.env.ENABLE_K8S_ROLLBACK === 'true';
-            const unstablePods = podResult.pods.filter(
-                p => p.phase !== 'Running' || !p.ready || p.restarts >= 3
-            );
-
-            const candidateDeployments = deploymentResult.deployments
-                .filter(dep => dep.status !== 'healthy' || unstablePods.some(p => p.name.startsWith(dep.name)))
-                .slice(0, 4);
-
-            const actions: RemediationAction[] = [];
-
-            for (const dep of candidateDeployments) {
-                const targetReplicas = Math.min(dep.replicas + 2, 20);
-
-                actions.push({
-                    id: buildKubernetesActionId('restart', namespace, dep.name),
-                    name: `Restart ${dep.name}`,
-                    description: `Rolling restart for deployment ${dep.name} in namespace ${namespace}`,
-                    type: 'automatic',
-                    risk: 'low',
-                    estimatedImpact: 'Brief pod churn while new replicas become ready',
-                    steps: [
-                        `Patch deployment ${dep.name} with restart annotation`,
-                        'Wait for rollout to create new pods',
-                        'Verify all replicas become healthy',
-                    ],
-                    enabled: remediationEnabled,
-                });
-
-                actions.push({
-                    id: buildKubernetesActionId('scale', namespace, dep.name, targetReplicas),
-                    name: `Scale ${dep.name} to ${targetReplicas}`,
-                    description: `Increase replica count for ${dep.name} to absorb incident traffic`,
-                    type: 'automatic',
-                    risk: 'low',
-                    estimatedImpact: `Additional cluster resource usage for ${targetReplicas} replicas`,
-                    steps: [
-                        `Update ${dep.name} scale target to ${targetReplicas}`,
-                        'Wait for new pods to schedule',
-                        'Verify load and error rates stabilize',
-                    ],
-                    enabled: remediationEnabled,
-                });
-
-                actions.push({
-                    id: buildKubernetesActionId('rollback', namespace, dep.name),
-                    name: `Rollback ${dep.name}`,
-                    description: `Roll back deployment ${dep.name} to the previous ReplicaSet revision`,
-                    type: 'manual',
-                    risk: 'high',
-                    estimatedImpact: 'Potentially disruptive if schema or API compatibility changed',
-                    steps: [
-                        'Identify previous healthy ReplicaSet revision',
-                        'Patch deployment template back to prior revision',
-                        'Validate health checks and traffic behavior',
-                    ],
-                    enabled: remediationEnabled && rollbackEnabled,
-                });
-            }
-
-            let filteredActions = actions;
-            if (params.riskLevel) {
-                filteredActions = filteredActions.filter(a => a.risk === params.riskLevel);
-            }
-
-            if (filteredActions.length > 0) {
-                return filteredActions;
-            }
-        }
+    if (!config.kubernetes.enabled) {
+        return [];
     }
 
-    let actions = mockRemediationActions;
+    const namespace =
+        config.kubernetes.defaultNamespace ||
+        config.kubernetes.allowedNamespaces?.[0] ||
+        'default';
+
+    const [deploymentResult, podResult] = await Promise.all([
+        getDeployments(namespace),
+        getPodStatus(namespace),
+    ]);
+
+    if (deploymentResult.error) {
+        return [];
+    }
+
+    const remediationEnabled = process.env.ENABLE_K8S_REMEDIATION === 'true';
+    const rollbackEnabled = process.env.ENABLE_K8S_ROLLBACK === 'true';
+    const unstablePods = podResult.pods.filter(
+        p => p.phase !== 'Running' || !p.ready || p.restarts >= 3
+    );
+
+    const candidateDeployments = deploymentResult.deployments
+        .filter(dep => dep.status !== 'healthy' || unstablePods.some(p => p.name.startsWith(dep.name)))
+        .slice(0, 4);
+
+    const actions: RemediationAction[] = [];
+
+    for (const dep of candidateDeployments) {
+        const targetReplicas = Math.min(dep.replicas + 2, 20);
+
+        actions.push({
+            id: buildKubernetesActionId('restart', namespace, dep.name),
+            name: `Restart ${dep.name}`,
+            description: `Rolling restart for deployment ${dep.name} in namespace ${namespace}`,
+            type: 'automatic',
+            risk: 'low',
+            estimatedImpact: 'Brief pod churn while new replicas become ready',
+            steps: [
+                `Patch deployment ${dep.name} with restart annotation`,
+                'Wait for rollout to create new pods',
+                'Verify all replicas become healthy',
+            ],
+            enabled: remediationEnabled,
+        });
+
+        actions.push({
+            id: buildKubernetesActionId('scale', namespace, dep.name, targetReplicas),
+            name: `Scale ${dep.name} to ${targetReplicas}`,
+            description: `Increase replica count for ${dep.name} to absorb incident traffic`,
+            type: 'automatic',
+            risk: 'low',
+            estimatedImpact: `Additional cluster resource usage for ${targetReplicas} replicas`,
+            steps: [
+                `Update ${dep.name} scale target to ${targetReplicas}`,
+                'Wait for new pods to schedule',
+                'Verify load and error rates stabilize',
+            ],
+            enabled: remediationEnabled,
+        });
+
+        actions.push({
+            id: buildKubernetesActionId('rollback', namespace, dep.name),
+            name: `Rollback ${dep.name}`,
+            description: `Roll back deployment ${dep.name} to the previous ReplicaSet revision`,
+            type: 'manual',
+            risk: 'high',
+            estimatedImpact: 'Potentially disruptive if schema or API compatibility changed',
+            steps: [
+                'Identify previous healthy ReplicaSet revision',
+                'Patch deployment template back to prior revision',
+                'Validate health checks and traffic behavior',
+            ],
+            enabled: remediationEnabled && rollbackEnabled,
+        });
+    }
 
     if (params.riskLevel) {
-        actions = actions.filter(a => a.risk === params.riskLevel);
+        return actions.filter(a => a.risk === params.riskLevel);
     }
 
     return actions;
 }
 
 /**
- * Simulate executing a remediation action
+ * Execute a remediation action
  */
 export async function executeRemediation(params: { actionId: string }) {
     const kubernetesAction = parseKubernetesActionId(params.actionId);
     const config = await getIntegrationConfig();
 
-    if (kubernetesAction && config.kubernetes.enabled) {
-        if (process.env.ENABLE_K8S_REMEDIATION !== 'true') {
-            return {
-                success: false,
-                error: 'Kubernetes remediation is disabled. Set ENABLE_K8S_REMEDIATION=true to allow live actions.',
-            };
-        }
-
-        if (!isNamespaceAllowed(kubernetesAction.namespace, config.kubernetes.allowedNamespaces)) {
-            return {
-                success: false,
-                error: `Namespace "${kubernetesAction.namespace}" is not in the allowed namespace list.`,
-            };
-        }
-
-        if (kubernetesAction.operation === 'rollback' && process.env.ENABLE_K8S_ROLLBACK !== 'true') {
-            return {
-                success: false,
-                error: 'Rollback is disabled. Set ENABLE_K8S_ROLLBACK=true for high-risk rollback actions.',
-            };
-        }
-
-        if (kubernetesAction.operation === 'restart') {
-            const result = await restartDeployment(kubernetesAction.deployment, kubernetesAction.namespace);
-            if (!result.success) {
-                return { success: false, error: result.error || 'Failed to restart deployment' };
-            }
-
-            return {
-                success: true,
-                action: `Restart ${kubernetesAction.deployment}`,
-                message: `Restart initiated for ${kubernetesAction.namespace}/${kubernetesAction.deployment}`,
-                steps: [
-                    'Deployment patched with restart annotation',
-                    'Kubernetes rollout triggered',
-                    'Pods will cycle while maintaining service availability',
-                ],
-                estimatedCompletion: '2-5 minutes',
-            };
-        }
-
-        if (kubernetesAction.operation === 'scale') {
-            const replicas = kubernetesAction.replicas || 1;
-            if (replicas < 1 || replicas > 100) {
-                return { success: false, error: 'Requested replica count is outside safety limits (1-100).' };
-            }
-
-            const result = await scaleDeployment(
-                kubernetesAction.deployment,
-                kubernetesAction.namespace,
-                replicas
-            );
-            if (!result.success) {
-                return { success: false, error: result.error || 'Failed to scale deployment' };
-            }
-
-            return {
-                success: true,
-                action: `Scale ${kubernetesAction.deployment}`,
-                message: `Scaling ${kubernetesAction.namespace}/${kubernetesAction.deployment} to ${replicas} replicas`,
-                steps: [
-                    `Scale subresource updated to ${replicas}`,
-                    'Scheduler places new pods on available nodes',
-                    'Health checks confirm readiness before full traffic',
-                ],
-                estimatedCompletion: '2-8 minutes',
-            };
-        }
-
-        if (kubernetesAction.operation === 'rollback') {
-            const result = await rollbackDeployment(kubernetesAction.deployment, kubernetesAction.namespace);
-            if (!result.success) {
-                return { success: false, error: result.error || 'Failed to rollback deployment' };
-            }
-
-            return {
-                success: true,
-                action: `Rollback ${kubernetesAction.deployment}`,
-                message: `Rollback initiated for ${kubernetesAction.namespace}/${kubernetesAction.deployment}`,
-                steps: [
-                    'Previous ReplicaSet template selected',
-                    'Deployment patched to prior revision',
-                    'Rollout progressing with prior known-good template',
-                ],
-                estimatedCompletion: '3-10 minutes',
-            };
-        }
+    if (!kubernetesAction || !config.kubernetes.enabled) {
+        return {
+            success: false,
+            error: INTEGRATION_HINT.kubernetes,
+        };
     }
 
-    const action = mockRemediationActions.find(a => a.id === params.actionId);
-
-    if (!action) {
-        return { success: false, error: 'Action not found' };
+    if (process.env.ENABLE_K8S_REMEDIATION !== 'true') {
+        return {
+            success: false,
+            error: 'Kubernetes remediation is disabled. Set ENABLE_K8S_REMEDIATION=true to allow live actions.',
+        };
     }
 
-    if (!action.enabled) {
-        return { success: false, error: 'Action is not enabled' };
+    if (!isNamespaceAllowed(kubernetesAction.namespace, config.kubernetes.allowedNamespaces)) {
+        return {
+            success: false,
+            error: `Namespace "${kubernetesAction.namespace}" is not in the allowed namespace list.`,
+        };
     }
 
-    // In a real implementation, this would execute kubectl commands, API calls, etc.
-    // For now, simulate execution
-    return {
-        success: true,
-        action: action.name,
-        message: `Successfully initiated: ${action.name}`,
-        steps: action.steps,
-        estimatedCompletion: '2 minutes',
-    };
+    if (kubernetesAction.operation === 'rollback' && process.env.ENABLE_K8S_ROLLBACK !== 'true') {
+        return {
+            success: false,
+            error: 'Rollback is disabled. Set ENABLE_K8S_ROLLBACK=true for high-risk rollback actions.',
+        };
+    }
+
+    if (kubernetesAction.operation === 'restart') {
+        const result = await restartDeployment(kubernetesAction.deployment, kubernetesAction.namespace);
+        if (!result.success) {
+            return { success: false, error: result.error || 'Failed to restart deployment' };
+        }
+
+        return {
+            success: true,
+            action: `Restart ${kubernetesAction.deployment}`,
+            message: `Restart initiated for ${kubernetesAction.namespace}/${kubernetesAction.deployment}`,
+            steps: [
+                'Deployment patched with restart annotation',
+                'Kubernetes rollout triggered',
+                'Pods will cycle while maintaining service availability',
+            ],
+            estimatedCompletion: '2-5 minutes',
+        };
+    }
+
+    if (kubernetesAction.operation === 'scale') {
+        const replicas = kubernetesAction.replicas || 1;
+        if (replicas < 1 || replicas > 100) {
+            return { success: false, error: 'Requested replica count is outside safety limits (1-100).' };
+        }
+
+        const result = await scaleDeployment(
+            kubernetesAction.deployment,
+            kubernetesAction.namespace,
+            replicas
+        );
+        if (!result.success) {
+            return { success: false, error: result.error || 'Failed to scale deployment' };
+        }
+
+        return {
+            success: true,
+            action: `Scale ${kubernetesAction.deployment}`,
+            message: `Scaling ${kubernetesAction.namespace}/${kubernetesAction.deployment} to ${replicas} replicas`,
+            steps: [
+                `Scale subresource updated to ${replicas}`,
+                'Scheduler places new pods on available nodes',
+                'Health checks confirm readiness before full traffic',
+            ],
+            estimatedCompletion: '2-8 minutes',
+        };
+    }
+
+    if (kubernetesAction.operation === 'rollback') {
+        const result = await rollbackDeployment(kubernetesAction.deployment, kubernetesAction.namespace);
+        if (!result.success) {
+            return { success: false, error: result.error || 'Failed to rollback deployment' };
+        }
+
+        return {
+            success: true,
+            action: `Rollback ${kubernetesAction.deployment}`,
+            message: `Rollback initiated for ${kubernetesAction.namespace}/${kubernetesAction.deployment}`,
+            steps: [
+                'Previous ReplicaSet template selected',
+                'Deployment patched to prior revision',
+                'Rollout progressing with prior known-good template',
+            ],
+            estimatedCompletion: '3-10 minutes',
+        };
+    }
+
+    return { success: false, error: 'Unsupported remediation operation.' };
 }
 
 /**
@@ -634,40 +653,34 @@ export async function executeRemediation(params: { actionId: string }) {
 export async function getSlackContext(params: { channel?: string }) {
     const config = await getIntegrationConfig();
 
-    if (config.slack.enabled) {
-        const { messages, summary, error } = await getSlackContextFromIntegration({
-            channel: params.channel,
-            hoursBack: 6,
-        });
-
-        if (!error && messages.length > 0) {
-            return {
-                messages: messages.map(m => ({
-                    author: m.author,
-                    message: m.text,
-                    channel: m.channel,
-                    timestamp: m.timestamp,
-                })),
-                summary: summary || `Retrieved ${messages.length} Slack messages for incident context`,
-                dataSource: 'slack',
-            };
-        }
+    if (!config.slack.enabled) {
+        return {
+            messages: [],
+            summary: INTEGRATION_HINT.slack,
+            dataSource: 'unavailable' as ToolDataSource,
+            error: INTEGRATION_HINT.slack,
+        };
     }
 
-    // Fall back to mock data
-    let messages = mockSlackMessages;
-
-    if (params.channel) {
-        messages = messages.filter(m => m.channel === params.channel);
-    }
+    const { messages, summary, error } = await getSlackContextFromIntegration({
+        channel: params.channel,
+        hoursBack: 6,
+    });
 
     return {
         messages: messages.map(m => ({
-            ...m,
-            timestamp: m.timestamp.toISOString(),
+            author: m.author,
+            message: m.text,
+            channel: m.channel,
+            timestamp: m.timestamp,
         })),
-        summary: 'Team discussion indicates awareness of batch processing changes and potential memory issues',
-        dataSource: 'mock',
+        summary:
+            summary ||
+            (error
+                ? `Slack context unavailable: ${error}`
+                : `Retrieved ${messages.length} Slack messages for incident context`),
+        dataSource: 'slack' as ToolDataSource,
+        error,
     };
 }
 
@@ -683,27 +696,16 @@ export async function getRootCauseAnalysis() {
         getHealthMetrics({}),
     ]);
 
-    const incidentSource = incidentResult.dataSource;
-    const alertsSource = alertsResult.dataSource;
-    const commitsSource = commitsResult.dataSource;
-    const slackSource = slackResult.dataSource;
-    const metricsSource = metricsResult.dataSource;
-
-    // If everything is mock, keep previous deterministic RCA output.
-    if (
-        incidentSource === 'mock' &&
-        alertsSource === 'mock' &&
-        commitsSource === 'mock' &&
-        slackSource === 'mock' &&
-        metricsSource === 'mock'
-    ) {
-        return mockRootCauseAnalysis;
-    }
+    const incidentSource = incidentResult.dataSource as ToolDataSource;
+    const alertsSource = alertsResult.dataSource as ToolDataSource;
+    const commitsSource = commitsResult.dataSource as ToolDataSource;
+    const slackSource = slackResult.dataSource as ToolDataSource;
+    const metricsSource = metricsResult.dataSource as ToolDataSource;
 
     const criticalAlerts = (alertsResult.alerts || []).map(a => ({
         service: a.service,
-        title: 'name' in a ? a.name : a.title,
-        detail: 'message' in a ? a.message : a.description,
+        title: a.title || a.name,
+        detail: a.message || a.description,
     }));
     const topAlert = criticalAlerts[0];
     const serviceFromAlert = topAlert?.service;
@@ -746,19 +748,19 @@ export async function getRootCauseAnalysis() {
 
     const evidence: string[] = [];
 
-    if (incidentSource !== 'mock') {
+    if (incidentSource !== 'unavailable' && incidentResult.id !== 'none') {
         evidence.push(`PagerDuty incident context is active for ${primaryService}.`);
     }
-    if (alertsSource !== 'mock' && topAlert) {
+    if (alertsSource !== 'unavailable' && topAlert) {
         evidence.push(`Critical alert: ${topAlert.title} (${topAlert.service}).`);
     }
-    if (commitsSource !== 'mock' && riskyCommitSha) {
+    if (commitsSource !== 'unavailable' && riskyCommitSha) {
         evidence.push(`Recent GitHub change with elevated risk: ${riskyCommitSha}.`);
     }
-    if (slackSource !== 'mock' && (slackResult.messages || []).length > 0) {
+    if (slackSource !== 'unavailable' && (slackResult.messages || []).length > 0) {
         evidence.push(`Slack incident channel contains recent team discussion with remediation hints.`);
     }
-    if (metricsSource !== 'mock') {
+    if (metricsSource !== 'unavailable') {
         const criticalMetric = (metricsResult.metrics || []).find(m => m.status === 'critical');
         if (criticalMetric) {
             evidence.push(`Critical metric observed: ${criticalMetric.name} at ${criticalMetric.value}${criticalMetric.unit}.`);
@@ -766,17 +768,28 @@ export async function getRootCauseAnalysis() {
     }
 
     if (evidence.length === 0) {
-        evidence.push('Insufficient live telemetry. Falling back to partial signals from available integrations.');
+        const setupHints = [
+            incidentResult.error,
+            alertsResult.error,
+            commitsResult.error,
+            slackResult.error,
+            metricsResult.error,
+        ].filter(Boolean);
+        evidence.push(
+            setupHints.length > 0
+                ? `Insufficient live telemetry. ${setupHints.join(' ')}`
+                : 'Insufficient live telemetry from configured integrations.'
+        );
     }
 
-    let confidence = 45;
-    if (incidentSource !== 'mock') confidence += 10;
-    if (alertsSource !== 'mock' && criticalAlerts.length > 0) confidence += 20;
-    if (commitsSource !== 'mock' && riskyCommitSha) confidence += 15;
-    if (slackSource !== 'mock' && (slackResult.messages || []).length > 0) confidence += 10;
-    if (metricsSource !== 'mock') confidence += 10;
+    let confidence = 20;
+    if (incidentSource !== 'unavailable' && incidentResult.id !== 'none') confidence += 10;
+    if (alertsSource !== 'unavailable' && criticalAlerts.length > 0) confidence += 20;
+    if (commitsSource !== 'unavailable' && riskyCommitSha) confidence += 15;
+    if (slackSource !== 'unavailable' && (slackResult.messages || []).length > 0) confidence += 10;
+    if (metricsSource !== 'unavailable' && (metricsResult.metrics || []).length > 0) confidence += 10;
     if (hasMemorySignal || hasLatencySignal || hasErrorSpikeSignal) confidence += 5;
-    confidence = Math.max(30, Math.min(95, confidence));
+    confidence = Math.max(10, Math.min(95, confidence));
 
     let recommendedAction = `Stabilize ${primaryService} with low-risk remediation (restart/scale), then validate error and latency recovery.`;
     if (riskyCommitSha) {
@@ -799,70 +812,82 @@ export async function getRootCauseAnalysis() {
 export async function getIncidentTimelineData(params?: { incidentId?: string }) {
     const config = await getIntegrationConfig();
 
-    // Try PagerDuty first
-    if (config.pagerduty.enabled) {
-        let incidentId = params?.incidentId;
+    if (!config.pagerduty.enabled) {
+        return {
+            timeline: [],
+            metricPoints: [],
+            dataSource: 'unavailable' as ToolDataSource,
+            error: INTEGRATION_HINT.pagerduty,
+        };
+    }
 
-        // If no incident ID provided, get the most recent active incident
-        if (!incidentId) {
-            const { incidents } = await getPagerDutyIncidents({
-                statuses: ['triggered', 'acknowledged'],
-                limit: 1,
-            });
-            if (incidents.length > 0) {
-                incidentId = incidents[0].id;
-            }
+    let incidentId = params?.incidentId;
+    if (!incidentId) {
+        const { incidents, error } = await getPagerDutyIncidents({
+            statuses: ['triggered', 'acknowledged'],
+            limit: 1,
+        });
+        if (error) {
+            return {
+                timeline: [],
+                metricPoints: [],
+                dataSource: 'pagerduty' as ToolDataSource,
+                error,
+            };
         }
-
-        if (incidentId) {
-            const { timeline, error } = await getPagerDutyIncidentTimeline(incidentId);
-
-            if (!error && timeline.length > 0) {
-                // Convert PagerDuty timeline to our format
-                const formattedTimeline = timeline.map(e => ({
-                    time: e.timestamp,
-                    event: e.message,
-                    type: e.type,
-                    author: e.agent?.name || 'System',
-                }));
-
-                // Generate metric points based on timeline (or fetch from Prometheus if configured)
-                const firstEvent = new Date(timeline[timeline.length - 1]?.timestamp || Date.now());
-                const metricPoints = [
-                    { time: new Date(firstEvent.getTime()).toISOString(), errorRate: 0.5, memory: 65 },
-                    { time: new Date(firstEvent.getTime() + 5 * 60000).toISOString(), errorRate: 5.2, memory: 78 },
-                    { time: new Date(firstEvent.getTime() + 10 * 60000).toISOString(), errorRate: 12.4, memory: 88 },
-                    { time: new Date(firstEvent.getTime() + 15 * 60000).toISOString(), errorRate: 15.8, memory: 95 },
-                    { time: new Date().toISOString(), errorRate: 14.2, memory: 93 },
-                ];
-
-                return {
-                    timeline: formattedTimeline,
-                    metricPoints,
-                    dataSource: 'pagerduty',
-                };
-            }
+        if (incidents.length > 0) {
+            incidentId = incidents[0].id;
         }
     }
 
-    // Fall back to mock data
-    const timeline = mockIncident.timeline.map(e => ({
-        time: e.timestamp.toISOString(),
-        event: e.description,
-        type: e.type,
-        author: e.author || 'System',
+    if (!incidentId) {
+        return {
+            timeline: [],
+            metricPoints: [],
+            dataSource: 'pagerduty' as ToolDataSource,
+        };
+    }
+
+    const { timeline, error } = await getPagerDutyIncidentTimeline(incidentId);
+    const formattedTimeline = timeline.map(e => ({
+        time: e.timestamp,
+        event: e.message,
+        type: mapPagerDutyTimelineType(e.type),
+        author: e.agent?.name || 'System',
     }));
 
-    // Add metric data points
-    const metricPoints = [
-        { time: new Date(Date.now() - 20 * 60000).toISOString(), errorRate: 0.5, memory: 65 },
-        { time: new Date(Date.now() - 15 * 60000).toISOString(), errorRate: 5.2, memory: 78 },
-        { time: new Date(Date.now() - 10 * 60000).toISOString(), errorRate: 12.4, memory: 88 },
-        { time: new Date(Date.now() - 5 * 60000).toISOString(), errorRate: 15.8, memory: 95 },
-        { time: new Date().toISOString(), errorRate: 14.2, memory: 93 },
-    ];
+    const end = new Date();
+    const start = new Date(end.getTime() - 30 * 60 * 1000);
+    let metricPoints: Array<{ time: string; errorRate: number; memory: number }> = [];
 
-    return { timeline, metricPoints, dataSource: 'mock' };
+    if (config.prometheus.enabled) {
+        const [errorRateRange, memoryRange] = await Promise.all([
+            queryPrometheusRange(
+                'sum(rate(http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total[5m])), 0.001) * 100',
+                { start, end, step: '5m' }
+            ),
+            queryPrometheusRange(
+                '(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100',
+                { start, end, step: '5m' }
+            ),
+        ]);
+
+        const errorSeries = errorRateRange.result[0]?.values || [];
+        const memorySeries = memoryRange.result[0]?.values || [];
+        const memoryByTimestamp = new Map(memorySeries.map(v => [v.timestamp, v.value]));
+        metricPoints = errorSeries.map(point => ({
+            time: point.timestamp,
+            errorRate: Math.max(0, Math.round(point.value * 100) / 100),
+            memory: Math.max(0, Math.round((memoryByTimestamp.get(point.timestamp) ?? 0) * 100) / 100),
+        }));
+    }
+
+    return {
+        timeline: formattedTimeline,
+        metricPoints,
+        dataSource: 'pagerduty' as ToolDataSource,
+        error,
+    };
 }
 
 /**
@@ -871,130 +896,121 @@ export async function getIncidentTimelineData(params?: { incidentId?: string }) 
 export async function getAnomalyHeatmapData() {
     const config = await getIntegrationConfig();
 
-    if (config.prometheus.enabled) {
-        const end = new Date();
-        const start = new Date(end.getTime() - 20 * 60 * 60 * 1000); // 6 buckets of 4h
-
-        const [errorRateRange, latencyRange] = await Promise.all([
-            queryPrometheusRange(
-                'sum(rate(http_requests_total{status=~"5.."}[5m])) by (job) / clamp_min(sum(rate(http_requests_total[5m])) by (job), 0.001) * 100',
-                { start, end, step: '4h' }
-            ),
-            queryPrometheusRange(
-                'histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job)) * 1000',
-                { start, end, step: '4h' }
-            ),
-        ]);
-
-        const liveSeries = [...errorRateRange.result, ...latencyRange.result].find(s => s.values.length > 0);
-        const defaultSlots = Array.from({ length: 6 }, (_, index) =>
-            new Date(start.getTime() + index * 4 * 60 * 60 * 1000).toISOString()
-        );
-        const slotTimestamps = liveSeries
-            ? liveSeries.values.slice(-6).map(v => v.timestamp)
-            : defaultSlots;
-
-        const buildSeriesMap = (
-            series: Array<{
-                metric: Record<string, string>;
-                values: Array<{ timestamp: string; value: number }>;
-            }>
-        ) => {
-            const seriesMap = new Map<string, number[]>();
-
-            for (const entry of series) {
-                const rawName =
-                    entry.metric.service ||
-                    entry.metric.job ||
-                    entry.metric.app ||
-                    entry.metric.k8s_app ||
-                    'unknown';
-
-                const formattedName = rawName
-                    .replace(/[-_]/g, ' ')
-                    .replace(/\b\w/g, (char) => char.toUpperCase());
-
-                const valuesByTimestamp = new Map(
-                    entry.values.map(v => [v.timestamp, Number.isFinite(v.value) ? v.value : 0])
-                );
-                const alignedValues = slotTimestamps.map(ts => valuesByTimestamp.get(ts) ?? 0);
-
-                if (!seriesMap.has(formattedName)) {
-                    seriesMap.set(formattedName, alignedValues);
-                }
-            }
-
-            return seriesMap;
-        };
-
-        const calculateStats = (values: number[]) => {
-            if (values.length === 0) {
-                return { mean: 0, stdDev: 0 };
-            }
-            const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-            const variance =
-                values.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) /
-                Math.max(values.length - 1, 1);
-            return { mean, stdDev: Math.sqrt(variance) };
-        };
-
-        const errorMap = buildSeriesMap(errorRateRange.result);
-        const latencyMap = buildSeriesMap(latencyRange.result);
-
-        const services = Array.from(new Set([...errorMap.keys(), ...latencyMap.keys()]));
-
-        if (services.length > 0) {
-            return services.slice(0, 12).map(service => {
-                const errorValues = errorMap.get(service) || new Array(slotTimestamps.length).fill(0);
-                const latencyValues = latencyMap.get(service) || new Array(slotTimestamps.length).fill(0);
-
-                const errorStats = calculateStats(errorValues);
-                const latencyStats = calculateStats(latencyValues);
-
-                return {
-                    service,
-                    anomalies: slotTimestamps.map((timestamp, index) => {
-                        const errorRate = errorValues[index] || 0;
-                        const latency = latencyValues[index] || 0;
-
-                        const errorZ =
-                            errorStats.stdDev > 0 ? Math.max(0, (errorRate - errorStats.mean) / errorStats.stdDev) : 0;
-                        const latencyZ =
-                            latencyStats.stdDev > 0
-                                ? Math.max(0, (latency - latencyStats.mean) / latencyStats.stdDev)
-                                : 0;
-
-                        const thresholdComponent =
-                            Math.min((errorRate / 5) * 60, 60) + Math.min((latency / 1000) * 25, 25);
-                        const zScoreComponent = Math.min(errorZ, 3) / 3 * 10 + Math.min(latencyZ, 3) / 3 * 5;
-                        const score = Math.max(0, Math.min(100, thresholdComponent + zScoreComponent));
-
-                        return {
-                            time: new Date(timestamp).toLocaleTimeString('en-US', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                hour12: false,
-                            }),
-                            score: Math.round(score * 10) / 10,
-                        };
-                    }),
-                };
-            });
-        }
+    if (!config.prometheus.enabled) {
+        return [];
     }
 
-    const services = ['API Gateway', 'Auth Service', 'Payment', 'Notification', 'Database', 'Cache', 'Search', 'CDN'];
-    const timeSlots = ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'];
+    const end = new Date();
+    const start = new Date(end.getTime() - 20 * 60 * 60 * 1000); // 6 buckets of 4h
 
-    const data = services.map(service => ({
-        service,
-        anomalies: timeSlots.map(time => ({
-            time,
-            score: service === 'Notification' && time === '16:00' ? 95 : Math.random() * 30,
-        })),
-    }));
+    const [errorRateRange, latencyRange] = await Promise.all([
+        queryPrometheusRange(
+            'sum(rate(http_requests_total{status=~"5.."}[5m])) by (job) / clamp_min(sum(rate(http_requests_total[5m])) by (job), 0.001) * 100',
+            { start, end, step: '4h' }
+        ),
+        queryPrometheusRange(
+            'histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job)) * 1000',
+            { start, end, step: '4h' }
+        ),
+    ]);
 
-    return data;
+    const liveSeries = [...errorRateRange.result, ...latencyRange.result].find(s => s.values.length > 0);
+    const defaultSlots = Array.from({ length: 6 }, (_, index) =>
+        new Date(start.getTime() + index * 4 * 60 * 60 * 1000).toISOString()
+    );
+    const slotTimestamps = liveSeries
+        ? liveSeries.values.slice(-6).map(v => v.timestamp)
+        : defaultSlots;
+
+    const buildSeriesMap = (
+        series: Array<{
+            metric: Record<string, string>;
+            values: Array<{ timestamp: string; value: number }>;
+        }>
+    ) => {
+        const seriesMap = new Map<string, number[]>();
+
+        for (const entry of series) {
+            const rawName =
+                entry.metric.service ||
+                entry.metric.job ||
+                entry.metric.app ||
+                entry.metric.k8s_app ||
+                'unknown';
+
+            const formattedName = rawName
+                .replace(/[-_]/g, ' ')
+                .replace(/\b\w/g, (char) => char.toUpperCase());
+
+            const valuesByTimestamp = new Map(
+                entry.values.map(v => [v.timestamp, Number.isFinite(v.value) ? v.value : 0])
+            );
+            const alignedValues = slotTimestamps.map(ts => valuesByTimestamp.get(ts) ?? 0);
+
+            if (!seriesMap.has(formattedName)) {
+                seriesMap.set(formattedName, alignedValues);
+            }
+        }
+
+        return seriesMap;
+    };
+
+    const calculateStats = (values: number[]) => {
+        if (values.length === 0) {
+            return { mean: 0, stdDev: 0 };
+        }
+        const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+        const variance =
+            values.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) /
+            Math.max(values.length - 1, 1);
+        return { mean, stdDev: Math.sqrt(variance) };
+    };
+
+    const errorMap = buildSeriesMap(errorRateRange.result);
+    const latencyMap = buildSeriesMap(latencyRange.result);
+
+    const services = Array.from(new Set([...errorMap.keys(), ...latencyMap.keys()]));
+
+    if (services.length > 0) {
+        return services.slice(0, 12).map(service => {
+            const errorValues = errorMap.get(service) || new Array(slotTimestamps.length).fill(0);
+            const latencyValues = latencyMap.get(service) || new Array(slotTimestamps.length).fill(0);
+
+            const errorStats = calculateStats(errorValues);
+            const latencyStats = calculateStats(latencyValues);
+
+            return {
+                service,
+                anomalies: slotTimestamps.map((timestamp, index) => {
+                    const errorRate = errorValues[index] || 0;
+                    const latency = latencyValues[index] || 0;
+
+                    const errorZ =
+                        errorStats.stdDev > 0 ? Math.max(0, (errorRate - errorStats.mean) / errorStats.stdDev) : 0;
+                    const latencyZ =
+                        latencyStats.stdDev > 0
+                            ? Math.max(0, (latency - latencyStats.mean) / latencyStats.stdDev)
+                            : 0;
+
+                    const thresholdComponent =
+                        Math.min((errorRate / 5) * 60, 60) + Math.min((latency / 1000) * 25, 25);
+                    const zScoreComponent = Math.min(errorZ, 3) / 3 * 10 + Math.min(latencyZ, 3) / 3 * 5;
+                    const score = Math.max(0, Math.min(100, thresholdComponent + zScoreComponent));
+
+                    return {
+                        time: new Date(timestamp).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false,
+                        }),
+                        score: Math.round(score * 10) / 10,
+                    };
+                }),
+            };
+        });
+    }
+
+    return [];
 }
 
 /**

@@ -5,8 +5,8 @@
  * AI can update this component's props to suggest and toggle remediation actions
  */
 
-import { withInteractable } from "@tambo-ai/react";
 import type { TamboComponent } from "@tambo-ai/react";
+import { withInteractable, useTambo } from "@tambo-ai/react";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
@@ -43,6 +43,27 @@ export const remediationPanelSchema = z.object({
 
 type RemediationPanelProps = z.infer<typeof remediationPanelSchema>;
 
+function normalizeRemediationProps(input: Partial<RemediationPanelProps> | undefined): RemediationPanelProps {
+    const actions = Array.isArray(input?.actions) ? input.actions : [];
+
+    return {
+        incidentId: input?.incidentId || "active-incident",
+        safeModeEnabled: Boolean(input?.safeModeEnabled),
+        trafficShiftingEnabled: Boolean(input?.trafficShiftingEnabled),
+        trafficShiftPercentage: Math.max(0, Math.min(100, Number(input?.trafficShiftPercentage ?? 0))),
+        recommendedAction: input?.recommendedAction,
+        actions: actions.map((action, index) => ({
+            id: action?.id || `action-${index}`,
+            name: action?.name || "Unnamed Action",
+            description: action?.description || "No description provided.",
+            type: action?.type || "manual",
+            risk: action?.risk || "medium",
+            enabled: Boolean(action?.enabled),
+            status: action?.status,
+        })),
+    };
+}
+
 const getActionIcon = (actionId: string) => {
     if (actionId.includes("rollback")) return RotateCcw;
     if (actionId.includes("scale")) return Scale;
@@ -65,31 +86,35 @@ const getRiskStyles = (risk: string) => {
 };
 
 function RemediationPanelBase(props: RemediationPanelProps) {
-    const [state, setState] = useState<RemediationPanelProps>(props);
+    const { sendThreadMessage, thread, isIdle } = useTambo();
+    const [state, setState] = useState<RemediationPanelProps>(() => normalizeRemediationProps(props));
     const [updatedFields, setUpdatedFields] = useState<Set<string>>(new Set());
-    const prevPropsRef = useRef<RemediationPanelProps>(props);
+    const [executingActionId, setExecutingActionId] = useState<string | null>(null);
+    const [lastUpdated, setLastUpdated] = useState<string>("--:--:--");
+    const prevPropsRef = useRef<RemediationPanelProps>(normalizeRemediationProps(props));
 
     // Track props changes from Tambo AI
     useEffect(() => {
+        const normalizedProps = normalizeRemediationProps(props);
         const prevProps = prevPropsRef.current;
         const changedFields = new Set<string>();
 
-        if (props.safeModeEnabled !== prevProps.safeModeEnabled) {
+        if (normalizedProps.safeModeEnabled !== prevProps.safeModeEnabled) {
             changedFields.add("safeModeEnabled");
         }
-        if (props.trafficShiftingEnabled !== prevProps.trafficShiftingEnabled) {
+        if (normalizedProps.trafficShiftingEnabled !== prevProps.trafficShiftingEnabled) {
             changedFields.add("trafficShiftingEnabled");
         }
-        if (props.trafficShiftPercentage !== prevProps.trafficShiftPercentage) {
+        if (normalizedProps.trafficShiftPercentage !== prevProps.trafficShiftPercentage) {
             changedFields.add("trafficShiftPercentage");
         }
-        if (props.recommendedAction !== prevProps.recommendedAction) {
+        if (normalizedProps.recommendedAction !== prevProps.recommendedAction) {
             changedFields.add("recommendedAction");
         }
 
         // Check action changes
-        props.actions.forEach((action, idx) => {
-            const prevAction = prevProps.actions[idx];
+        normalizedProps.actions.forEach((action, idx) => {
+            const prevAction = prevProps.actions?.[idx];
             if (prevAction && action.enabled !== prevAction.enabled) {
                 changedFields.add(`action-${action.id}`);
             }
@@ -98,8 +123,9 @@ function RemediationPanelBase(props: RemediationPanelProps) {
             }
         });
 
-        setState(props);
-        prevPropsRef.current = props;
+        setState(normalizedProps);
+        prevPropsRef.current = normalizedProps;
+        setLastUpdated(new Date().toLocaleTimeString());
 
         if (changedFields.size > 0) {
             setUpdatedFields(changedFields);
@@ -125,23 +151,24 @@ function RemediationPanelBase(props: RemediationPanelProps) {
         }));
     };
 
-    const executeAction = (actionId: string) => {
-        setState((prev) => ({
-            ...prev,
-            actions: prev.actions.map((a) =>
-                a.id === actionId ? { ...a, status: "running" } : a
-            ),
-        }));
+    const executeAction = async (actionId: string) => {
+        if (!isIdle || executingActionId) return;
+        if (!thread?.id) return;
 
-        // Simulate execution
-        setTimeout(() => {
-            setState((prev) => ({
-                ...prev,
-                actions: prev.actions.map((a) =>
-                    a.id === actionId ? { ...a, status: "completed" } : a
-                ),
-            }));
-        }, 3000);
+        setExecutingActionId(actionId);
+        try {
+            await sendThreadMessage(
+                `Execute remediation action "${actionId}". Use tool executeRemediation and report the result clearly.`,
+                {
+                    threadId: thread.id,
+                    streamResponse: true,
+                }
+            );
+        } catch (error) {
+            console.error("Failed to execute remediation action via tool:", error);
+        } finally {
+            setExecutingActionId(null);
+        }
     };
 
     return (
@@ -293,7 +320,7 @@ function RemediationPanelBase(props: RemediationPanelProps) {
                                             <p className="text-sm text-gray-400">{action.description}</p>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            {action.status === "running" ? (
+                                            {action.status === "running" || executingActionId === action.id ? (
                                                 <motion.div
                                                     animate={{ rotate: 360 }}
                                                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -319,8 +346,9 @@ function RemediationPanelBase(props: RemediationPanelProps) {
                                                         <motion.button
                                                             initial={{ scale: 0 }}
                                                             animate={{ scale: 1 }}
-                                                            onClick={() => executeAction(action.id)}
+                                                            onClick={() => void executeAction(action.id)}
                                                             className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 transition-colors"
+                                                            disabled={!isIdle || !!executingActionId}
                                                         >
                                                             <Play className="w-4 h-4 text-white" />
                                                         </motion.button>
@@ -339,7 +367,7 @@ function RemediationPanelBase(props: RemediationPanelProps) {
             {/* Status Bar */}
             <div className="px-6 py-3 bg-gray-800/50 border-t border-gray-700">
                 <div className="flex items-center justify-between text-xs text-gray-400">
-                    <span>Last updated: {new Date().toLocaleTimeString()}</span>
+                    <span>Last updated: {lastUpdated}</span>
                     <span className="flex items-center gap-1">
                         <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                         AI suggestions active
@@ -371,11 +399,13 @@ export function RemediationPanel({
     initialSafeMode = false,
     initialTrafficShifting = false,
     initialTrafficPercentage = 0,
+    initialActions = [],
 }: {
     incidentId: string;
     initialSafeMode?: boolean;
     initialTrafficShifting?: boolean;
     initialTrafficPercentage?: number;
+    initialActions?: RemediationPanelProps["actions"];
 }) {
     return (
         <InteractableRemediationPanel
@@ -383,32 +413,7 @@ export function RemediationPanel({
             safeModeEnabled={initialSafeMode}
             trafficShiftingEnabled={initialTrafficShifting}
             trafficShiftPercentage={initialTrafficPercentage}
-            actions={[
-                {
-                    id: "rem-rollback",
-                    name: "Rollback Deployment",
-                    description: "Rollback to previous stable version (v1.9.2)",
-                    type: "automatic",
-                    risk: "medium",
-                    enabled: false,
-                },
-                {
-                    id: "rem-scale",
-                    name: "Scale Horizontal",
-                    description: "Add 5 additional pods to handle load",
-                    type: "automatic",
-                    risk: "low",
-                    enabled: false,
-                },
-                {
-                    id: "rem-restart",
-                    name: "Restart Service Pods",
-                    description: "Perform rolling restart of all pods",
-                    type: "automatic",
-                    risk: "low",
-                    enabled: false,
-                },
-            ]}
+            actions={initialActions}
             onPropsUpdate={(newProps) => {
                 console.log("Remediation panel updated by AI:", newProps);
             }}

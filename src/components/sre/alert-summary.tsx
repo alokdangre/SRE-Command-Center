@@ -4,8 +4,6 @@ import type { TamboComponent } from "@tambo-ai/react";
 import { z } from "zod";
 import { motion } from "framer-motion";
 import {
-    Activity,
-    Bell,
     Clock,
     Server,
     ExternalLink,
@@ -27,9 +25,65 @@ export const alertSummarySchema = z.object({
 });
 
 type AlertSummaryProps = z.infer<typeof alertSummarySchema>;
+type AlertSeverity = "critical" | "warning" | "info";
+type AlertStatus = "firing" | "acknowledged" | "resolved";
+type AlertRecord = z.infer<typeof alertSchema>;
+
+function normalizeSeverity(input: unknown): AlertSeverity {
+    if (typeof input !== "string") return "info";
+    const value = input.toLowerCase();
+    if (value === "critical" || value === "warning" || value === "info") return value;
+    if (value === "high") return "critical";
+    if (value === "medium" || value === "low") return "warning";
+    return "info";
+}
+
+function normalizeStatus(input: unknown): AlertStatus {
+    if (typeof input !== "string") return "firing";
+    const value = input.toLowerCase();
+    if (value === "firing" || value === "acknowledged" || value === "resolved") return value;
+    if (value === "active" || value === "triggered") return "firing";
+    return "firing";
+}
+
+function normalizeAlert(
+    alert: Partial<AlertRecord> & Record<string, unknown>,
+    index: number
+): AlertRecord {
+    const timestamp =
+        typeof alert.timestamp === "string" && alert.timestamp
+            ? alert.timestamp
+            : "";
+    const service =
+        typeof alert.service === "string" && alert.service.trim().length > 0
+            ? alert.service
+            : "unknown";
+    const title =
+        typeof alert.title === "string" && alert.title.trim().length > 0
+            ? alert.title
+            : typeof alert.name === "string" && alert.name.trim().length > 0
+                ? alert.name
+                : typeof alert.message === "string" && alert.message.trim().length > 0
+                    ? alert.message
+                    : "untitled alert";
+    const id =
+        typeof alert.id === "string" && alert.id.trim().length > 0
+            ? alert.id
+            : `${service}-${timestamp}-${index}`;
+
+    return {
+        id,
+        severity: normalizeSeverity(alert.severity),
+        title,
+        service,
+        timestamp,
+        status: normalizeStatus(alert.status),
+    };
+}
 
 function formatTimeAgo(isoString: string): string {
     const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return "N/A";
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
@@ -41,7 +95,7 @@ function formatTimeAgo(isoString: string): string {
     return `${Math.floor(diffHours / 24)}D_AGO`;
 }
 
-function AlertTerminalCard({ alert, index }: { alert: z.infer<typeof alertSchema>; index: number }) {
+function AlertTerminalCard({ alert, index }: { alert: AlertRecord; index: number }) {
     const isCritical = alert.severity === 'critical';
 
     return (
@@ -86,7 +140,10 @@ function AlertTerminalCard({ alert, index }: { alert: z.infer<typeof alertSchema
 }
 
 export function AlertSummary(props: AlertSummaryProps) {
-    const { alerts = [], showAll = false } = props || {};
+    const { showAll = false } = props || {};
+    const alerts = (Array.isArray(props?.alerts) ? props.alerts : []).map((alert, index) =>
+        normalizeAlert(alert as Partial<AlertRecord> & Record<string, unknown>, index)
+    );
 
     const criticalCount = alerts?.filter(a => a.severity === "critical").length || 0;
     const warningCount = alerts?.filter(a => a.severity === "warning").length || 0;

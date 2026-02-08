@@ -15,22 +15,22 @@ const REMEDIATION_ACTIONS: SuggestedAction[] = [
     {
         id: "action-remediation-options",
         label: "List remediation options",
-        prompt: "What remediation options are available for the notification service right now?",
+        prompt: "Use tool getRemediationOptions and list the live remediation options available right now.",
     },
     {
-        id: "action-scale-notification",
-        label: "Scale notification service",
-        prompt: "Scale the notification service and explain expected impact before execution.",
+        id: "action-scale-service",
+        label: "Plan safe scaling",
+        prompt: "Identify the best low-risk scaling remediation option from live data and explain expected impact before execution.",
     },
     {
         id: "action-rollback-check",
         label: "Assess rollback safety",
-        prompt: "Is rollback the safest option right now? Use commits, alerts, and incident context.",
+        prompt: "Is rollback the safest option right now? Use live commits, alerts, and incident context only.",
     },
     {
         id: "action-incident-summary",
         label: "Generate incident summary",
-        prompt: "Generate a concise incident summary with root cause confidence and next steps.",
+        prompt: "Generate a concise incident summary from live integrations with root cause confidence and next steps.",
     },
 ];
 

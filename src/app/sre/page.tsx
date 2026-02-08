@@ -46,10 +46,12 @@ const DictationButton = dynamic(() => import("@/components/tambo/dictation-butto
 });
 
 function TerminalHeader() {
-    const [time, setTime] = useState(new Date());
+    const [time, setTime] = useState("--:--:--");
 
     useEffect(() => {
-        const timer = setInterval(() => setTime(new Date()), 1000);
+        const updateTime = () => setTime(new Date().toLocaleTimeString());
+        updateTime();
+        const timer = setInterval(updateTime, 1000);
         return () => clearInterval(timer);
     }, []);
 
@@ -64,11 +66,11 @@ function TerminalHeader() {
                 <div className="flex items-center gap-4 text-gray-400">
                     <span className="flex items-center gap-1">
                         <Cpu className="w-3 h-3" />
-                        CPU: 42%
+                        TELEMETRY: LIVE
                     </span>
                     <span className="flex items-center gap-1">
                         <Database className="w-3 h-3" />
-                        MEM: 68%
+                        SOURCE: INTEGRATIONS
                     </span>
                     <span className="flex items-center gap-1 text-green-500">
                         <Shield className="w-3 h-3" />
@@ -87,7 +89,7 @@ function TerminalHeader() {
                 <UserNav />
                 <span className="text-cyan-500/70 hidden sm:inline">SESSION: 0xc4ffde21</span>
                 <span className="text-white bg-gray-900 px-2 py-0.5 rounded border border-gray-800">
-                    {time.toLocaleTimeString()}
+                    {time}
                 </span>
             </div>
         </div>
@@ -105,7 +107,7 @@ export default function SRECommandCenter() {
             mcpServers={mcpServers}
         >
             <ThreadPersistence />
-            <TamboRuntimeContext incidentId="inc-2024-001" isChatOpen={isChatOpen} />
+            <TamboRuntimeContext incidentId="active-incident" isChatOpen={isChatOpen} />
             <div className="flex flex-col h-screen bg-black text-white selection:bg-cyan-500/30 font-mono">
                 {/* Scanline Effect */}
                 <div className="scanline" />
@@ -123,32 +125,32 @@ export default function SRECommandCenter() {
                                     <AsciiLogo />
                                     <div className="mt-4 p-4 border border-cyan-500/20 bg-cyan-500/5 rounded-lg terminal-flicker">
                                         <div className="flex items-center gap-2 mb-2">
-                                            <AlertTriangle className="w-4 h-4 text-red-500 animate-pulse" />
-                                            <span className="text-red-500 font-bold">CRITICAL_ALERT (ID: 40291)</span>
+                                            <AlertTriangle className="w-4 h-4 text-amber-500 animate-pulse" />
+                                            <span className="text-amber-500 font-bold">LIVE INCIDENT WORKSPACE</span>
                                         </div>
                                         <p className="text-gray-300 leading-relaxed max-w-2xl">
-                                            NOTIFICATION_SERVICE is throwing 5xx errors in us-east-1.
-                                            Latency is spiking to &gt;2s. Memory pressure detected on node cluster-04.
+                                            This dashboard shows live integration data only. Use the AI console to fetch
+                                            current system overview, active alerts, incident timeline, and remediation options.
                                         </p>
                                         <div className="mt-4 flex gap-4 text-xs">
-                                            <span className="text-cyan-400">status: investigating</span>
+                                            <span className="text-cyan-400">status: awaiting-query</span>
                                             <span className="text-gray-500">|</span>
-                                            <span className="text-cyan-400">impact: high</span>
+                                            <span className="text-cyan-400">mode: live-data</span>
                                             <span className="text-gray-500">|</span>
-                                            <span className="text-cyan-400">ETA: 14m</span>
+                                            <span className="text-cyan-400">source: connected-integrations</span>
                                         </div>
                                     </div>
                                 </div>
                                 <div className="w-full md:w-auto">
                                     <AsciiStatus />
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-3 border border-green-500/20 rounded bg-green-500/5">
-                                            <div className="text-[10px] text-green-500/70 uppercase">Uptime</div>
-                                            <div className="text-xl font-bold text-green-500">99.992%</div>
+                                        <div className="p-3 border border-cyan-500/20 rounded bg-cyan-500/5">
+                                            <div className="text-[10px] text-cyan-500/70 uppercase">Prometheus</div>
+                                            <div className="text-xl font-bold text-cyan-500">LIVE</div>
                                         </div>
-                                        <div className="p-3 border border-red-500/20 rounded bg-red-500/5">
-                                            <div className="text-[10px] text-red-500/70 uppercase">Errors (H)</div>
-                                            <div className="text-xl font-bold text-red-500">12.4%</div>
+                                        <div className="p-3 border border-cyan-500/20 rounded bg-cyan-500/5">
+                                            <div className="text-[10px] text-cyan-500/70 uppercase">PagerDuty</div>
+                                            <div className="text-xl font-bold text-cyan-500">LIVE</div>
                                         </div>
                                     </div>
                                 </div>
@@ -161,19 +163,19 @@ export default function SRECommandCenter() {
                                     Remediation_Controls
                                 </div>
                                 <RemediationPanel
-                                    incidentId="inc-2024-001"
+                                    incidentId="active-incident"
                                     initialSafeMode={false}
                                     initialTrafficShifting={false}
                                     initialTrafficPercentage={0}
                                 />
                             </div>
 
-                            {/* Operational Log Mock */}
+                            {/* Live Command Guide */}
                             <div className="p-4 border border-gray-800 rounded bg-gray-900/20 font-mono text-xs text-gray-500 space-y-1">
-                                <div>[14:20:01] INFO: Initializing SRE_CMD_CTR...</div>
-                                <div>[14:20:03] WARN: Anomaly detected in Notification Service</div>
-                                <div>[14:20:05] INFO: AI Assistant ready for deployment metadata analysis</div>
-                                <div className="text-cyan-500/50">[14:22:48] READY: Waiting for user command_</div>
+                                <div>[LIVE] Try: Use tool getSystemOverview and show result.</div>
+                                <div>[LIVE] Try: Use tool getActiveAlerts with severity critical.</div>
+                                <div>[LIVE] Try: Use tool getCurrentIncident and getIncidentTimelineData.</div>
+                                <div className="text-cyan-500/50">[READY] Waiting for live command_</div>
                             </div>
                         </div>
                     </div>

@@ -51,6 +51,23 @@ import {
   getTimezoneInfo,
 } from "@/services/local-tools";
 
+const toolDataSourceSchema = z.enum([
+  "prometheus",
+  "github",
+  "pagerduty",
+  "slack",
+  "kubernetes",
+  "mixed",
+  "unavailable",
+]);
+
+const integrationStatusSchema = z.object({
+  name: z.string(),
+  enabled: z.boolean(),
+  status: z.enum(["connected", "disconnected", "error"]),
+  details: z.string().optional(),
+});
+
 /**
  * SRE Tools - Backend data fetching and analysis
  */
@@ -70,6 +87,9 @@ export const tools: TamboTool[] = [
       activeAlerts: z.number(),
       activeIncidents: z.number(),
       lastUpdated: z.string(),
+      dataSource: toolDataSourceSchema.optional(),
+      integrations: z.array(integrationStatusSchema).optional(),
+      error: z.string().optional(),
     }),
   },
   {
@@ -80,18 +100,22 @@ export const tools: TamboTool[] = [
     inputSchema: z.object({
       serviceName: z.string().optional().describe("Optional service name to filter by"),
     }),
-    outputSchema: z.array(
-      z.object({
-        id: z.string(),
-        name: z.string(),
-        status: z.enum(["healthy", "degraded", "critical", "unknown"]),
-        uptime: z.number(),
-        latency: z.number(),
-        errorRate: z.number(),
-        requestsPerSecond: z.number(),
-        version: z.string().optional(),
-      })
-    ),
+    outputSchema: z.object({
+      services: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          status: z.enum(["healthy", "degraded", "critical", "unknown"]),
+          uptime: z.number(),
+          latency: z.number(),
+          errorRate: z.number(),
+          requestsPerSecond: z.number(),
+          version: z.string().optional(),
+        })
+      ),
+      dataSource: toolDataSourceSchema.optional(),
+      error: z.string().optional(),
+    }),
   },
   {
     name: "getActiveAlerts",
@@ -102,16 +126,23 @@ export const tools: TamboTool[] = [
       severity: z.enum(["critical", "warning", "info"]).optional(),
       service: z.string().optional(),
     }),
-    outputSchema: z.array(
-      z.object({
-        id: z.string(),
-        severity: z.enum(["critical", "warning", "info"]),
-        title: z.string(),
-        service: z.string(),
-        timestamp: z.string(),
-        status: z.enum(["firing", "acknowledged", "resolved"]),
-      })
-    ),
+    outputSchema: z.object({
+      alerts: z.array(
+        z.object({
+          id: z.string(),
+          severity: z.enum(["critical", "warning", "info"]),
+          title: z.string(),
+          service: z.string(),
+          timestamp: z.string(),
+          status: z.enum(["firing", "acknowledged", "resolved"]),
+          name: z.string().optional(),
+          message: z.string().optional(),
+          description: z.string().optional(),
+        })
+      ),
+      dataSource: toolDataSourceSchema.optional(),
+      error: z.string().optional(),
+    }),
   },
   {
     name: "getCurrentIncident",
@@ -126,7 +157,7 @@ export const tools: TamboTool[] = [
       status: z.enum(["investigating", "identified", "monitoring", "resolved"]),
       startTime: z.string(),
       duration: z.number().describe("Duration in minutes"),
-      affectedServices: z.array(z.string()),
+      affectedServices: z.array(z.string()).optional(),
       timeline: z.array(
         z.object({
           timestamp: z.string(),
@@ -135,12 +166,14 @@ export const tools: TamboTool[] = [
           author: z.string().optional(),
         })
       ),
+      dataSource: toolDataSourceSchema.optional(),
+      error: z.string().optional(),
     }),
   },
   {
     name: "analyzeRecentCommits",
     description:
-      "Analyze recent code commits to find potential breaking changes or suspicious deployments. Simulates GitHub MCP integration.",
+      "Analyze recent code commits from the connected GitHub integration to find potential breaking changes or risky deployments.",
     tool: analyzeRecentCommits,
     inputSchema: z.object({
       service: z.string().optional(),
@@ -160,6 +193,8 @@ export const tools: TamboTool[] = [
       ),
       suspiciousCommits: z.array(z.any()),
       summary: z.string(),
+      dataSource: toolDataSourceSchema.optional(),
+      error: z.string().optional(),
     }),
   },
   {
@@ -170,15 +205,19 @@ export const tools: TamboTool[] = [
     inputSchema: z.object({
       metricName: z.string().optional(),
     }),
-    outputSchema: z.array(
-      z.object({
-        name: z.string(),
-        value: z.number(),
-        unit: z.string(),
-        trend: z.enum(["up", "down", "stable"]),
-        status: z.enum(["ok", "warning", "critical"]),
-      })
-    ),
+    outputSchema: z.object({
+      metrics: z.array(
+        z.object({
+          name: z.string(),
+          value: z.number(),
+          unit: z.string(),
+          trend: z.enum(["up", "down", "stable"]),
+          status: z.enum(["ok", "warning", "critical"]),
+        })
+      ),
+      dataSource: toolDataSourceSchema.optional(),
+      error: z.string().optional(),
+    }),
   },
   {
     name: "getRemediationOptions",
@@ -221,7 +260,7 @@ export const tools: TamboTool[] = [
   {
     name: "getSlackContext",
     description:
-      "Get relevant Slack conversations about the incident. Simulates Slack MCP integration for team context.",
+      "Get relevant Slack conversations about the incident from the connected Slack integration for team context.",
     tool: getSlackContext,
     inputSchema: z.object({
       channel: z.string().optional().default("#incidents"),
@@ -236,6 +275,8 @@ export const tools: TamboTool[] = [
         })
       ),
       summary: z.string(),
+      dataSource: toolDataSourceSchema.optional(),
+      error: z.string().optional(),
     }),
   },
   {
@@ -256,7 +297,9 @@ export const tools: TamboTool[] = [
     description:
       "Get timeline and metric data for incident visualization. Use this to populate the IncidentTimeline component.",
     tool: getIncidentTimelineData,
-    inputSchema: z.object({}),
+    inputSchema: z.object({
+      incidentId: z.string().optional(),
+    }),
     outputSchema: z.object({
       timeline: z.array(
         z.object({
@@ -273,6 +316,8 @@ export const tools: TamboTool[] = [
           memory: z.number(),
         })
       ),
+      dataSource: toolDataSourceSchema.optional(),
+      error: z.string().optional(),
     }),
   },
   {

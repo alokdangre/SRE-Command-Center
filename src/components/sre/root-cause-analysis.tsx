@@ -3,7 +3,7 @@
 import type { TamboComponent } from "@tambo-ai/react";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { Brain, Activity, Target, Zap, AlertTriangle, GitCommit, ChevronRight } from "lucide-react";
+import { Brain, Activity, Target, Zap, GitCommit, ChevronRight } from "lucide-react";
 
 export const rootCauseAnalysisSchema = z.object({
     suspectedCause: z.string(),
@@ -27,7 +27,6 @@ export function RootCauseAnalysis(props: RootCauseAnalysisProps) {
         evidence = [],
         recommendedAction = "AWAITING_INSTRUCTION...",
         relatedCommits = [],
-        slackInsights = []
     } = props || {};
 
     return (
@@ -118,7 +117,7 @@ export function RootCauseAnalysis(props: RootCauseAnalysisProps) {
                 <div className="flex items-center gap-3 text-[10px] text-gray-500">
                     <span className="animate-pulse">●</span>
                     <span>NEURAL_ENGINE_STATUS: NOMINAL</span>
-                    <span className="ml-auto">PROCESS_ID: RCA_{Math.floor(Math.random() * 10000)}</span>
+                    <span className="ml-auto">PROCESS_ID: RCA_LIVE</span>
                 </div>
             </div>
         </motion.div>
