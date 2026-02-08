@@ -6,6 +6,7 @@
  */
 
 import { withInteractable } from "@tambo-ai/react";
+import type { TamboComponent } from "@tambo-ai/react";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,7 +32,7 @@ const remediationActionSchema = z.object({
     status: z.enum(["idle", "running", "completed", "failed"]).optional(),
 });
 
-const remediationPanelSchema = z.object({
+export const remediationPanelSchema = z.object({
     incidentId: z.string(),
     safeModeEnabled: z.boolean(),
     trafficShiftingEnabled: z.boolean(),
@@ -355,6 +356,14 @@ export const InteractableRemediationPanel = withInteractable(RemediationPanelBas
     description: "A remediation control panel that allows toggling Safe Mode, Traffic Shifting, and various remediation actions. The AI can update props to enable/disable features and suggest actions for incident response.",
     propsSchema: remediationPanelSchema,
 });
+
+export const remediationPanelComponent: TamboComponent = {
+    name: "RemediationPanel",
+    description:
+        "Interactable remediation control panel for incident response actions including restart, scale, rollback, and safety toggles.",
+    component: InteractableRemediationPanel,
+    propsSchema: remediationPanelSchema,
+};
 
 // Export for use in pages
 export function RemediationPanel({

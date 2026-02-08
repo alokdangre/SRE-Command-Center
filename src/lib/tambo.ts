@@ -17,6 +17,9 @@ import { anomalyHeatmapComponent } from "@/components/sre/anomaly-heatmap";
 import { serviceStatusGridComponent } from "@/components/sre/service-status-grid";
 import { rootCauseAnalysisComponent } from "@/components/sre/root-cause-analysis";
 import { alertSummaryComponent } from "@/components/sre/alert-summary";
+import { interactableServiceCardComponent } from "@/components/sre/interactable-service-card";
+import { incidentNotesComponent } from "@/components/sre/incident-notes";
+import { remediationPanelComponent } from "@/components/sre/remediation-panel";
 import { Graph, graphSchema } from "@/components/tambo/graph";
 
 // Import SRE tools
@@ -429,6 +432,9 @@ export const components: TamboComponent[] = [
   serviceStatusGridComponent,
   rootCauseAnalysisComponent,
   alertSummaryComponent,
+  interactableServiceCardComponent,
+  incidentNotesComponent,
+  remediationPanelComponent,
   {
     name: "Graph",
     description:

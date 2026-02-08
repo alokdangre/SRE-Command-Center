@@ -19,25 +19,22 @@ import {
     ThreadContent,
     ThreadContentMessages,
 } from "@/components/tambo/thread-content";
+import { ThreadPersistence } from "@/components/tambo/thread-persistence";
+import { TamboRuntimeContext } from "@/components/tambo/tambo-runtime-context";
 import { useMcpServers } from "@/components/tambo/mcp-config-modal";
 import { components, tools } from "@/lib/tambo";
 import { RemediationPanel } from "@/components/sre/remediation-panel";
+import { SuggestedActions } from "@/components/sre/suggested-actions";
 import { AsciiLogo, AsciiStatus } from "@/components/sre/ascii-art";
 import { UserNav } from "@/components/auth/user-nav";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     AlertTriangle,
-    Activity,
     Shield,
-    MessageSquare,
     ChevronLeft,
     ChevronRight,
-    Mic,
     Zap,
-    Server,
-    Bell,
     Terminal,
-    Clock,
     Cpu,
     Database,
     Settings,
@@ -47,14 +44,6 @@ import Link from "next/link";
 const DictationButton = dynamic(() => import("@/components/tambo/dictation-button"), {
     ssr: false,
 });
-
-// Mock data for the status bar
-const systemStatus = {
-    overall: "degraded" as const,
-    activeIncidents: 1,
-    activeAlerts: 5,
-    services: { healthy: 6, degraded: 1, critical: 1 },
-};
 
 function TerminalHeader() {
     const [time, setTime] = useState(new Date());
@@ -115,6 +104,8 @@ export default function SRECommandCenter() {
             tools={tools}
             mcpServers={mcpServers}
         >
+            <ThreadPersistence />
+            <TamboRuntimeContext incidentId="inc-2024-001" isChatOpen={isChatOpen} />
             <div className="flex flex-col h-screen bg-black text-white selection:bg-cyan-500/30 font-mono">
                 {/* Scanline Effect */}
                 <div className="scanline" />
@@ -215,6 +206,8 @@ export default function SRECommandCenter() {
                                             <ThreadContentMessages />
                                         </ThreadContent>
                                     </ScrollableMessageContainer>
+
+                                    <SuggestedActions />
 
                                     {/* Command Entry */}
                                     <div className="p-4 border-t border-cyan-500/20 bg-black">
