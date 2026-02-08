@@ -123,34 +123,58 @@ export default function SRECommandCenter() {
                             <div className="flex flex-col md:flex-row gap-8 items-start justify-between border-b border-cyan-500/10 pb-8">
                                 <div className="flex-1">
                                     <AsciiLogo />
-                                    <div className="mt-4 p-4 border border-cyan-500/20 bg-cyan-500/5 rounded-lg terminal-flicker">
+                                    <div className="mt-4 p-4 border border-cyan-500/20 bg-cyan-500/5 terminal-flicker relative">
+                                        <div className="absolute top-0 left-0 w-1 h-2 bg-cyan-500/40" />
+                                        <div className="absolute top-0 right-0 w-1 h-2 bg-cyan-500/40" />
                                         <div className="flex items-center gap-2 mb-2">
                                             <AlertTriangle className="w-4 h-4 text-amber-500 animate-pulse" />
-                                            <span className="text-amber-500 font-bold">LIVE INCIDENT WORKSPACE</span>
+                                            <span className="text-amber-500 font-bold uppercase tracking-tighter text-xs">MODULE // LIVE_INCIDENT_WORKSPACE</span>
                                         </div>
                                         <p className="text-gray-300 leading-relaxed max-w-2xl">
                                             This dashboard shows live integration data only. Use the AI console to fetch
                                             current system overview, active alerts, incident timeline, and remediation options.
                                         </p>
-                                        <div className="mt-4 flex gap-4 text-xs">
-                                            <span className="text-cyan-400">status: awaiting-query</span>
-                                            <span className="text-gray-500">|</span>
-                                            <span className="text-cyan-400">mode: live-data</span>
-                                            <span className="text-gray-500">|</span>
-                                            <span className="text-cyan-400">source: connected-integrations</span>
+                                        <div className="mt-4 flex gap-4 text-[10px] uppercase font-bold">
+                                            <span className="text-cyan-400">STATUS: AWAITING_QUERY</span>
+                                            <span className="text-gray-500">{"//"}</span>
+                                            <span className="text-cyan-400">MODE: LIVE_DATA</span>
+                                            <span className="text-gray-500">{"//"}</span>
+                                            <span className="text-cyan-400">INTEGRATIONS: CONNECTED</span>
                                         </div>
                                     </div>
                                 </div>
                                 <div className="w-full md:w-auto">
                                     <AsciiStatus />
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-3 border border-cyan-500/20 rounded bg-cyan-500/5">
-                                            <div className="text-[10px] text-cyan-500/70 uppercase">Prometheus</div>
-                                            <div className="text-xl font-bold text-cyan-500">LIVE</div>
+                                        <div className="group relative p-4 border border-cyan-500/20 bg-black overflow-hidden">
+                                            <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500/40" />
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] text-gray-500 uppercase tracking-tighter">DATA_STRM:</span>
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_5px_rgba(6,182,212,0.5)]" />
+                                                </div>
+                                                <div className="text-xs font-bold text-gray-300">PROMETHEUS</div>
+                                                <div className="flex items-end justify-between mt-2">
+                                                    <div className="text-xl font-black text-cyan-500 tracking-tighter">LIVE</div>
+                                                    <div className="text-[8px] text-cyan-500/40 font-mono mb-1">MS_LAT: 24ms</div>
+                                                </div>
+                                            </div>
+                                            <div className="absolute bottom-0 right-0 w-12 h-12 bg-cyan-500/5 rotate-45 translate-x-6 translate-y-6" />
                                         </div>
-                                        <div className="p-3 border border-cyan-500/20 rounded bg-cyan-500/5">
-                                            <div className="text-[10px] text-cyan-500/70 uppercase">PagerDuty</div>
-                                            <div className="text-xl font-bold text-cyan-500">LIVE</div>
+                                        <div className="group relative p-4 border border-cyan-500/20 bg-black overflow-hidden">
+                                            <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500/40" />
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] text-gray-500 uppercase tracking-tighter">INC_VCTR:</span>
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_5px_rgba(6,182,212,0.5)]" />
+                                                </div>
+                                                <div className="text-xs font-bold text-gray-300">PAGERDUTY</div>
+                                                <div className="flex items-end justify-between mt-2">
+                                                    <div className="text-xl font-black text-cyan-500 tracking-tighter">LIVE</div>
+                                                    <div className="text-[8px] text-cyan-500/40 font-mono mb-1">ACK_RT: 98%</div>
+                                                </div>
+                                            </div>
+                                            <div className="absolute bottom-0 right-0 w-12 h-12 bg-cyan-500/5 rotate-45 translate-x-6 translate-y-6" />
                                         </div>
                                     </div>
                                 </div>
@@ -160,7 +184,7 @@ export default function SRECommandCenter() {
                             <div className="space-y-4">
                                 <div className="flex items-center gap-2 text-cyan-500 uppercase tracking-widest text-xs font-bold">
                                     <Zap className="w-4 h-4" />
-                                    Remediation_Controls
+                                    MODULE {"//"} REMEDIATION_ENG
                                 </div>
                                 <RemediationPanel
                                     incidentId="active-incident"

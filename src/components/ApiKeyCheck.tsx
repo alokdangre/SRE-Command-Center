@@ -1,31 +1,45 @@
 "use client";
 
 import { useState } from "react";
+import { ShieldAlert, Cpu, Copy, Check, ExternalLink } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface ApiKeyCheckProps {
   children: React.ReactNode;
 }
 
 const ApiKeyMissingAlert = () => (
-  <div className="mb-4 p-6 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
-    <p className="mb-3">To get started, you need to initialize Tambo:</p>
-    <div className="flex items-center gap-2 bg-gray-100 p-3 rounded mb-3">
-      <code className="text-sm flex-grow">npx tambo init</code>
-      <CopyButton text="npx tambo init" />
+  <div className="mt-6 p-6 border border-amber-500/30 bg-amber-500/5 relative overflow-hidden font-mono">
+    <div className="absolute top-0 left-0 w-1 h-full bg-amber-500/40" />
+    <div className="flex items-center gap-3 text-amber-500 mb-4 font-black italic tracking-tighter">
+      <ShieldAlert className="w-5 h-5 animate-pulse" />
+      <span>MISSION_CRITICAL // INITIALIZATION_ERROR</span>
     </div>
-    <p className="text-sm">
-      Or visit{" "}
-      <a
-        href="https://tambo.co/cli-auth"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="underline hover:text-yellow-900"
-      >
-        tambo.co/cli-auth
-      </a>{" "}
-      to get your API key and set it in{" "}
-      <code className="bg-yellow-100 px-2 py-1 rounded">.env.local</code>
+
+    <p className="text-gray-300 text-sm mb-6 uppercase tracking-wider leading-relaxed">
+      Neural link requires an active Tambo handshake. No API key detected in your local environment.
     </p>
+
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <div className="text-[10px] text-amber-500/50 uppercase font-bold tracking-widest">Execute_Command:</div>
+        <div className="flex items-center gap-2 bg-black/40 border border-gray-800 p-3 relative group">
+          <code className="text-cyan-500 text-xs flex-grow">npx tambo init</code>
+          <CopyButton text="npx tambo init" />
+        </div>
+      </div>
+
+      <div className="pt-4 border-t border-amber-500/10">
+        <a
+          href="https://tambo.co/cli-auth"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 text-[10px] text-gray-500 hover:text-cyan-400 transition-colors uppercase font-black"
+        >
+          Request_Neural_Credentials <ExternalLink className="w-3 h-3" />
+        </a>
+      </div>
+    </div>
   </div>
 );
 
@@ -41,42 +55,13 @@ const CopyButton = ({ text }: { text: string }) => {
   return (
     <button
       onClick={copyToClipboard}
-      className="p-2 text-gray-600 hover:text-gray-900 bg-gray-100 rounded transition-colors relative group"
-      title="Copy to clipboard"
+      className="p-1.5 text-gray-500 hover:text-white transition-colors"
     >
       {showCopied ? (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M20 6L9 17l-5-5" />
-        </svg>
+        <Check className="w-4 h-4 text-green-500" />
       ) : (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
+        <Copy className="w-4 h-4" />
       )}
-      <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-        {showCopied ? "Copied!" : "Copy"}
-      </span>
     </button>
   );
 };
@@ -85,16 +70,36 @@ export function ApiKeyCheck({ children }: ApiKeyCheckProps) {
   const isApiKeyMissing = !process.env.NEXT_PUBLIC_TAMBO_API_KEY;
 
   return (
-    <div className="flex items-start gap-4">
-      <div className="flex-grow">
-        <div className="flex items-center gap-1">
-          <div className="min-w-6">{isApiKeyMissing ? "❌" : "✅"}</div>
-          <p>
-            {isApiKeyMissing ? "Tambo not initialized" : "Tambo initialized"}
-          </p>
+    <div className="w-full">
+      <div className="flex flex-col items-center">
+        {/* Connection Status Label - Subtle and Cyberpunk */}
+        <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-2 px-3 py-1 border border-cyan-500/20 bg-cyan-500/5">
+            <div className={`w-1.5 h-1.5 rounded-full ${isApiKeyMissing ? "bg-amber-500 animate-pulse" : "bg-green-500"} shadow-[0_0_8px_rgba(34,197,94,0.3)]`} />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-500/70">
+              {isApiKeyMissing ? "SRE_OS: STANDBY" : "KERNEL_LINK: STABLE"}
+            </span>
+          </div>
+          <div className="h-px w-8 bg-cyan-500/10" />
+          <div className="flex items-center gap-2 px-3 py-1 border border-cyan-500/20 bg-cyan-500/5">
+            <Cpu className="w-3 h-3 text-cyan-500/50" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-500/70">
+              {isApiKeyMissing ? "AUTH: PENDING" : "AUTH: VERIFIED"}
+            </span>
+          </div>
         </div>
-        {isApiKeyMissing && <ApiKeyMissingAlert />}
-        {!isApiKeyMissing && children}
+
+        {isApiKeyMissing ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full"
+          >
+            <ApiKeyMissingAlert />
+          </motion.div>
+        ) : (
+          children
+        )}
       </div>
     </div>
   );

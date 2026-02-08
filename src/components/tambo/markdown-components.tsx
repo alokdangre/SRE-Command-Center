@@ -54,7 +54,7 @@ const looksLikeCode = (text: string): boolean => {
 function ResourceMention({ name, uri }: { name: string; uri: string }) {
   return (
     <span
-      className="mention resource inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground cursor-default"
+      className="mention resource inline-flex items-center border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold text-cyan-400 cursor-default uppercase tracking-tighter"
       data-resource-uri={uri}
       title={uri}
     >
@@ -108,8 +108,8 @@ const CodeHeader = ({
   }, [copied, error]);
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-t-md bg-container px-4 py-2 text-sm font-semibold text-foreground">
-      <span className="lowercase text-muted-foreground">{language}</span>
+    <div className="flex items-center justify-between gap-4 border-b border-cyan-500/20 bg-black/40 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-cyan-500/70">
+      <span className="lowercase">{language}</span>
       <button
         onClick={copyToClipboard}
         className="p-1 rounded-md hover:bg-backdrop transition-colors cursor-pointer"
@@ -146,19 +146,19 @@ export const createMarkdownComponents = (): Record<
 
     if (match && looksLikeCode(content)) {
       return (
-        <div className="relative border border-border rounded-md bg-muted max-w-[80ch] text-sm my-4">
+        <div className="relative border border-cyan-500/20 bg-black/60 max-w-full text-sm my-4 font-mono shadow-[0_0_20px_rgba(0,0,0,0.5)]">
           <CodeHeader language={match[1]} code={content} />
           <div
             className={cn(
-              "overflow-x-auto rounded-b-md bg-background",
+              "overflow-x-auto bg-[#05070a]",
               "[&::-webkit-scrollbar]:w-[6px]",
-              "[&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 [&::-webkit-scrollbar-thumb]:rounded-md",
+              "[&::-webkit-scrollbar-thumb]:bg-cyan-500/20 [&::-webkit-scrollbar-thumb]:rounded-none",
               "[&::-webkit-scrollbar:horizontal]:h-[4px]",
             )}
           >
-            <pre className="p-4 whitespace-pre">
+            <pre className="p-4 whitespace-pre font-mono leading-relaxed">
               <code
-                className={className}
+                className={cn(className, "text-cyan-50/90")}
                 dangerouslySetInnerHTML={{
                   __html: DOMPurify.sanitize(highlighted ?? content),
                 }}

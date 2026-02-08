@@ -191,16 +191,7 @@ const ThreadHistoryHeader = React.forwardRef<
       )}
       {...props}
     >
-      <h2
-        className={cn(
-          "text-sm text-muted-foreground whitespace-nowrap ",
-          isCollapsed
-            ? "opacity-0 max-w-0 overflow-hidden "
-            : "opacity-100 max-w-none transition-all duration-300 delay-75",
-        )}
-      >
-        Tambo Conversations
-      </h2>
+      <div className="flex-1" />
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         className={cn(

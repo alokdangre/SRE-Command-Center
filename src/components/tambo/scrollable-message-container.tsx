@@ -80,10 +80,7 @@ export const ScrollableMessageContainer = React.forwardRef<
     if (scrollContainerRef.current && messagesContent && shouldAutoscroll) {
       const scroll = () => {
         if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollTo({
-            top: scrollContainerRef.current.scrollHeight,
-            behavior: "smooth",
-          });
+          scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
         }
       };
 

@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+    Zap,
     RotateCcw,
     Scale,
     Shield,
@@ -173,27 +174,33 @@ function RemediationPanelBase(props: RemediationPanelProps) {
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-xl border border-gray-700 overflow-hidden"
+            className="bg-black/80 border border-cyan-500/20 relative overflow-hidden font-mono"
         >
+            {/* Scanline overlay for the panel */}
+            <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%] z-10 opacity-30" />
+
             {/* Header */}
-            <div className="bg-gradient-to-r from-indigo-600/20 to-purple-600/20 px-6 py-4 border-b border-gray-700">
+            <div className="bg-cyan-500/10 px-6 py-3 border-b border-cyan-500/20 relative z-20">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h3 className="text-lg font-semibold text-white">Remediation Panel</h3>
-                        <p className="text-sm text-gray-400">Incident #{state.incidentId}</p>
+                        <div className="text-[10px] text-cyan-500/50 uppercase tracking-widest mb-1">MODULE {"//"} REMEDIATION_ENG</div>
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-cyan-500" />
+                            INCIDENT_CONTROL_PANEL
+                        </h3>
                     </div>
                     {state.recommendedAction && (
                         <motion.div
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 ${updatedFields.has("recommendedAction") ? "animate-pulse ring-2 ring-amber-500" : ""
+                            className={`flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 ${updatedFields.has("recommendedAction") ? "animate-pulse ring-1 ring-amber-500" : ""
                                 }`}
                         >
-                            <AlertTriangle className="w-4 h-4 text-amber-400" />
-                            <span className="text-sm font-medium text-amber-300">
-                                Recommended: {state.recommendedAction}
+                            <AlertTriangle className="w-3 h-3 text-amber-500" />
+                            <span className="text-[10px] font-bold text-amber-500 uppercase">
+                                SUGGESTED: {state.recommendedAction.toUpperCase()}
                             </span>
                         </motion.div>
                     )}
@@ -201,71 +208,71 @@ function RemediationPanelBase(props: RemediationPanelProps) {
             </div>
 
             {/* Quick Controls */}
-            <div className="p-6 border-b border-gray-700">
-                <h4 className="text-sm font-medium text-gray-300 mb-4">Quick Controls</h4>
+            <div className="p-6 border-b border-cyan-500/10 relative z-20">
+                <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-4">SYSTEM_POLICIES {"//"} QUICK_MODE</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Safe Mode Toggle */}
                     <motion.div
-                        className={`bg-gray-800/50 rounded-lg p-4 border transition-all ${updatedFields.has("safeModeEnabled")
-                                ? "border-purple-500 ring-2 ring-purple-500/50"
-                                : "border-gray-700"
+                        className={`bg-black/40 p-4 border transition-all ${updatedFields.has("safeModeEnabled")
+                            ? "border-cyan-500 bg-cyan-500/5"
+                            : "border-gray-800"
                             }`}
                     >
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                                <Shield className={`w-5 h-5 ${state.safeModeEnabled ? "text-purple-400" : "text-gray-500"}`} />
-                                <span className="font-medium text-white">Safe Mode</span>
+                                <Shield className={`w-4 h-4 ${state.safeModeEnabled ? "text-cyan-400" : "text-gray-600"}`} />
+                                <span className="text-xs font-bold text-gray-300 uppercase">Safe_Mode</span>
                             </div>
                             <button
                                 onClick={() => handleToggle("safeModeEnabled", !state.safeModeEnabled)}
-                                className={`relative w-12 h-6 rounded-full transition-colors ${state.safeModeEnabled ? "bg-purple-600" : "bg-gray-600"
+                                className={`relative w-10 h-5 border transition-colors ${state.safeModeEnabled ? "border-cyan-500 bg-cyan-500/20" : "border-gray-700 bg-gray-900"
                                     }`}
                             >
                                 <motion.div
                                     layout
-                                    className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md"
-                                    style={{ left: state.safeModeEnabled ? "calc(100% - 22px)" : "2px" }}
+                                    className={`absolute top-0.5 w-3.5 h-3.5 ${state.safeModeEnabled ? "bg-cyan-500" : "bg-gray-600"}`}
+                                    style={{ left: state.safeModeEnabled ? "calc(100% - 18px)" : "4px" }}
                                 />
                             </button>
                         </div>
-                        <p className="text-xs text-gray-400">
-                            Reduces non-essential features, prioritizes core functionality
+                        <p className="text-[10px] text-gray-500 uppercase leading-relaxed">
+                            THROTTLE_NON_ESSENTIAL // PRIORITIZE_CORE_STK
                         </p>
                     </motion.div>
 
                     {/* Traffic Shifting */}
                     <motion.div
-                        className={`bg-gray-800/50 rounded-lg p-4 border transition-all ${updatedFields.has("trafficShiftingEnabled") || updatedFields.has("trafficShiftPercentage")
-                                ? "border-blue-500 ring-2 ring-blue-500/50"
-                                : "border-gray-700"
+                        className={`bg-black/40 p-4 border transition-all ${updatedFields.has("trafficShiftingEnabled") || updatedFields.has("trafficShiftPercentage")
+                            ? "border-amber-500 bg-amber-500/5"
+                            : "border-gray-800"
                             }`}
                     >
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                                <Globe className={`w-5 h-5 ${state.trafficShiftingEnabled ? "text-blue-400" : "text-gray-500"}`} />
-                                <span className="font-medium text-white">Traffic Shifting</span>
+                                <Globe className={`w-4 h-4 ${state.trafficShiftingEnabled ? "text-amber-400" : "text-gray-600"}`} />
+                                <span className="text-xs font-bold text-gray-300 uppercase">Traffic_Shift</span>
                             </div>
                             <button
                                 onClick={() => handleToggle("trafficShiftingEnabled", !state.trafficShiftingEnabled)}
-                                className={`relative w-12 h-6 rounded-full transition-colors ${state.trafficShiftingEnabled ? "bg-blue-600" : "bg-gray-600"
+                                className={`relative w-10 h-5 border transition-colors ${state.trafficShiftingEnabled ? "border-amber-500 bg-amber-500/20" : "border-gray-700 bg-gray-900"
                                     }`}
                             >
                                 <motion.div
                                     layout
-                                    className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md"
-                                    style={{ left: state.trafficShiftingEnabled ? "calc(100% - 22px)" : "2px" }}
+                                    className={`absolute top-0.5 w-3.5 h-3.5 ${state.trafficShiftingEnabled ? "bg-amber-500" : "bg-gray-600"}`}
+                                    style={{ left: state.trafficShiftingEnabled ? "calc(100% - 18px)" : "4px" }}
                                 />
                             </button>
                         </div>
-                        {state.trafficShiftingEnabled && (
+                        {state.trafficShiftingEnabled ? (
                             <motion.div
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: "auto" }}
                                 className="mt-3"
                             >
-                                <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-                                    <span>Shift to backup region</span>
-                                    <span className="font-mono text-blue-400">{state.trafficShiftPercentage}%</span>
+                                <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+                                    <span className="uppercase">BACKUP_RGN_LVL</span>
+                                    <span className="font-mono text-amber-500 font-bold">{state.trafficShiftPercentage}%</span>
                                 </div>
                                 <input
                                     type="range"
@@ -273,17 +280,21 @@ function RemediationPanelBase(props: RemediationPanelProps) {
                                     max="100"
                                     value={state.trafficShiftPercentage}
                                     onChange={(e) => handleSliderChange(Number(e.target.value))}
-                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                    className="w-full h-1 bg-gray-800 appearance-none cursor-pointer accent-amber-500"
                                 />
                             </motion.div>
+                        ) : (
+                            <p className="text-[10px] text-gray-500 uppercase leading-relaxed">
+                                REROUTE_INGRESS // FAILOVER_ENABLED: FALSE
+                            </p>
                         )}
                     </motion.div>
                 </div>
             </div>
 
             {/* Remediation Actions */}
-            <div className="p-6">
-                <h4 className="text-sm font-medium text-gray-300 mb-4">Available Actions</h4>
+            <div className="p-6 relative z-20">
+                <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-4">ACTION_SEQUENCE {"//"} AVAILABLE</div>
                 <div className="space-y-3">
                     <AnimatePresence>
                         {state.actions.map((action) => {
@@ -298,48 +309,54 @@ function RemediationPanelBase(props: RemediationPanelProps) {
                                     layout
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    className={`bg-gray-800/50 rounded-lg p-4 border transition-all ${isHighlighted || statusChanged
-                                            ? "border-cyan-500 ring-2 ring-cyan-500/50"
-                                            : "border-gray-700"
+                                    className={`bg-black/60 p-4 border transition-all ${isHighlighted || statusChanged
+                                        ? "border-cyan-500 ring-1 ring-cyan-500/30"
+                                        : "border-gray-800 hover:border-cyan-500/20"
                                         }`}
                                 >
                                     <div className="flex items-start gap-4">
-                                        <div className={`p-2 rounded-lg ${riskStyle.bg} ${riskStyle.border} border`}>
-                                            <Icon className={`w-5 h-5 ${riskStyle.text}`} />
+                                        <div className={`p-2 border ${riskStyle.border} ${riskStyle.bg}`}>
+                                            <Icon className={`w-4 h-4 ${riskStyle.text}`} />
                                         </div>
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className="font-medium text-white">{action.name}</span>
-                                                <span className={`text-xs px-2 py-0.5 rounded-full ${riskStyle.bg} ${riskStyle.text}`}>
-                                                    {action.risk} risk
+                                                <span className="text-xs font-bold text-gray-200 uppercase tracking-tight">{action.name}</span>
+                                                <span className={`text-[8px] px-1.5 py-0.5 border font-bold uppercase ${riskStyle.border} ${riskStyle.text} ${riskStyle.bg}`}>
+                                                    {action.risk}_RISK
                                                 </span>
-                                                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300">
+                                                <span className="text-[8px] px-1.5 py-0.5 border border-gray-700 text-gray-500 uppercase font-bold">
                                                     {action.type}
                                                 </span>
                                             </div>
-                                            <p className="text-sm text-gray-400">{action.description}</p>
+                                            <p className="text-[10px] text-gray-500 uppercase tracking-tighter">{action.description}</p>
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-3">
                                             {action.status === "running" || executingActionId === action.id ? (
-                                                <motion.div
-                                                    animate={{ rotate: 360 }}
-                                                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                                >
-                                                    <Loader2 className="w-5 h-5 text-blue-400" />
-                                                </motion.div>
+                                                <div className="flex items-center gap-2">
+                                                    <motion.div
+                                                        animate={{ rotate: 360 }}
+                                                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                                    >
+                                                        <Loader2 className="w-4 h-4 text-cyan-400" />
+                                                    </motion.div>
+                                                    <span className="text-[10px] text-cyan-500 font-bold animate-pulse">RUNNING</span>
+                                                </div>
                                             ) : action.status === "completed" ? (
-                                                <CheckCircle className="w-5 h-5 text-green-400" />
+                                                <div className="flex items-center gap-2">
+                                                    <CheckCircle className="w-4 h-4 text-green-500" />
+                                                    <span className="text-[10px] text-green-500 font-bold">DONE</span>
+                                                </div>
                                             ) : (
                                                 <>
                                                     <button
                                                         onClick={() => handleActionToggle(action.id, !action.enabled)}
-                                                        className={`w-10 h-6 rounded-full transition-colors ${action.enabled ? "bg-green-600" : "bg-gray-600"
+                                                        className={`relative w-8 h-4 border transition-colors ${action.enabled ? "border-green-500 bg-green-500/20" : "border-gray-700 bg-gray-900"
                                                             }`}
                                                     >
                                                         <motion.div
                                                             layout
-                                                            className="w-4 h-4 bg-white rounded-full shadow-md mx-1"
-                                                            style={{ marginLeft: action.enabled ? "auto" : "4px", marginRight: action.enabled ? "4px" : "auto" }}
+                                                            className={`absolute top-0.5 w-2.5 h-2.5 ${action.enabled ? "bg-green-500" : "bg-gray-600"}`}
+                                                            style={{ left: action.enabled ? "calc(100% - 13px)" : "3px" }}
                                                         />
                                                     </button>
                                                     {action.enabled && (
@@ -347,10 +364,10 @@ function RemediationPanelBase(props: RemediationPanelProps) {
                                                             initial={{ scale: 0 }}
                                                             animate={{ scale: 1 }}
                                                             onClick={() => void executeAction(action.id)}
-                                                            className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 transition-colors"
+                                                            className="px-3 py-1 bg-cyan-500 hover:bg-cyan-400 transition-colors uppercase text-[10px] font-bold text-black border-b-2 border-cyan-800 active:border-b-0 active:translate-y-[1px]"
                                                             disabled={!isIdle || !!executingActionId}
                                                         >
-                                                            <Play className="w-4 h-4 text-white" />
+                                                            RUN_CMD
                                                         </motion.button>
                                                     )}
                                                 </>
@@ -365,12 +382,15 @@ function RemediationPanelBase(props: RemediationPanelProps) {
             </div>
 
             {/* Status Bar */}
-            <div className="px-6 py-3 bg-gray-800/50 border-t border-gray-700">
-                <div className="flex items-center justify-between text-xs text-gray-400">
-                    <span>Last updated: {lastUpdated}</span>
-                    <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                        AI suggestions active
+            <div className="px-6 py-2 bg-cyan-500/5 border-t border-cyan-500/10 relative z-20">
+                <div className="flex items-center justify-between text-[9px] uppercase tracking-widest text-gray-500">
+                    <span className="flex items-center gap-2">
+                        <span className="text-cyan-500/50">TIMESTAMP_REF:</span>
+                        {lastUpdated}
+                    </span>
+                    <span className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                        AI_SUGGESTIONS: ACTIVE
                     </span>
                 </div>
             </div>

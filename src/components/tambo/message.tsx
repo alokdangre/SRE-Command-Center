@@ -318,7 +318,7 @@ const MessageContent = React.forwardRef<HTMLDivElement, MessageContentProps>(
     { className, children, content: contentProp, markdown = true, ...props },
     ref,
   ) => {
-    const { message, isLoading } = useMessageContext();
+    const { message, isLoading, role } = useMessageContext();
     const contentToRender = children ?? contentProp ?? message.content;
 
     const markdownContent = React.useMemo(() => {
@@ -336,7 +336,10 @@ const MessageContent = React.forwardRef<HTMLDivElement, MessageContentProps>(
       <div
         ref={ref}
         className={cn(
-          "relative block rounded-3xl px-4 py-2 text-[15px] leading-relaxed transition-all duration-200 font-medium max-w-full [&_p]:py-1 [&_li]:list-item",
+          "relative block border px-4 py-3 text-[14px] leading-relaxed transition-all duration-200 font-mono max-w-full [&_p]:py-1 [&_li]:list-item",
+          role === "user"
+            ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-50 shadow-[0_0_15px_rgba(6,182,212,0.1)]"
+            : "bg-black/40 border-gray-800 text-gray-100",
           className,
         )}
         data-slot="message-content"
@@ -594,7 +597,7 @@ const SamplingSubThread = ({
                   className={cn(
                     "whitespace-pre-wrap",
                     m.role === "assistant" &&
-                      "bg-muted/50 rounded-md p-2 inline-block w-fit",
+                    "bg-muted/50 rounded-md p-2 inline-block w-fit",
                   )}
                 >
                   {getSafeContent(m.content)}

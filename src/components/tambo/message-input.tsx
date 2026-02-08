@@ -162,17 +162,17 @@ function useCombinedResourceList(
     () =>
       mcpResources
         ? (
-            mcpResources as {
-              resource: { uri: string; name?: string };
-            }[]
-          ).map((entry) => ({
-            // Use the full URI (already includes serverKey prefix from MCP hook)
-            // When inserted as @{id}, parseResourceReferences will strip serverKey before sending to backend
-            id: entry.resource.uri,
-            name: entry.resource.name ?? entry.resource.uri,
-            icon: React.createElement(AtSign, { className: "w-4 h-4" }),
-            componentData: { type: "mcp-resource", data: entry },
-          }))
+          mcpResources as {
+            resource: { uri: string; name?: string };
+          }[]
+        ).map((entry) => ({
+          // Use the full URI (already includes serverKey prefix from MCP hook)
+          // When inserted as @{id}, parseResourceReferences will strip serverKey before sending to backend
+          id: entry.resource.uri,
+          name: entry.resource.name ?? entry.resource.uri,
+          icon: React.createElement(AtSign, { className: "w-4 h-4" }),
+          componentData: { type: "mcp-resource", data: entry },
+        }))
         : [],
     [mcpResources],
   );
@@ -237,11 +237,11 @@ function useCombinedPromptList(
     () =>
       mcpPrompts
         ? (mcpPrompts as { prompt: { name: string } }[]).map((entry) => ({
-            id: `mcp-prompt:${entry.prompt.name}`,
-            name: entry.prompt.name,
-            icon: React.createElement(FileText, { className: "w-4 h-4" }),
-            text: "", // Text will be fetched when selected via useTamboMcpPrompt
-          }))
+          id: `mcp-prompt:${entry.prompt.name}`,
+          name: entry.prompt.name,
+          icon: React.createElement(FileText, { className: "w-4 h-4" }),
+          text: "", // Text will be fetched when selected via useTamboMcpPrompt
+        }))
         : [],
     [mcpPrompts],
   );
@@ -674,7 +674,7 @@ const MessageInputInternal = React.forwardRef<
       <form
         ref={ref}
         onSubmit={handleSubmit}
-        className={cn(messageInputVariants({ variant }), className)}
+        className={cn(messageInputVariants({ variant }), "flex-shrink-0", className)}
         data-slot="message-input-form"
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
@@ -684,10 +684,10 @@ const MessageInputInternal = React.forwardRef<
       >
         <div
           className={cn(
-            "relative flex flex-col rounded-xl bg-background shadow-md p-2 px-3",
+            "relative flex flex-col bg-black/80 backdrop-blur-sm p-2 px-4 py-3",
             isDragging
-              ? "border border-dashed border-emerald-400"
-              : "border border-border",
+              ? "border border-dashed border-cyan-500 animate-pulse"
+              : "border border-cyan-500/30",
           )}
         >
           {isDragging && (
@@ -898,7 +898,7 @@ const MessageInputTextarea = ({
         resources={resourceItems}
         onSearchPrompts={setPromptSearch}
         prompts={promptItems}
-        onResourceSelect={onResourceSelect ?? (() => {})}
+        onResourceSelect={onResourceSelect ?? (() => { })}
         onPromptSelect={handlePromptSelect}
       />
     </div>
@@ -1074,9 +1074,8 @@ const MCPIcon = () => {
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
-      width="24"
-      height="24"
-      color="#000000"
+      width="20"
+      height="20"
       fill="none"
     >
       <path
@@ -1119,7 +1118,7 @@ const MessageInputMcpConfigButton = React.forwardRef<
   const [isModalOpen, setIsModalOpen] = React.useState(false);
 
   const buttonClasses = cn(
-    "w-10 h-10 rounded-lg border border-border bg-background text-foreground transition-colors hover:bg-muted disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+    "w-10 h-10 border border-cyan-500/20 bg-cyan-500/5 text-cyan-500/70 transition-all hover:bg-cyan-500/10 hover:border-cyan-500/40 hover:text-cyan-400 flex items-center justify-center focus:outline-none",
     className,
   );
 
@@ -1247,7 +1246,7 @@ const MessageInputFileButton = React.forwardRef<
   };
 
   const buttonClasses = cn(
-    "w-10 h-10 rounded-lg border border-border bg-background text-foreground transition-colors hover:bg-muted disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+    "w-10 h-10 border border-cyan-500/20 bg-cyan-500/5 text-cyan-500/70 transition-all hover:bg-cyan-500/10 hover:border-cyan-500/40 hover:text-cyan-400 flex items-center justify-center focus:outline-none",
     className,
   );
 

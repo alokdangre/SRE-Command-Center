@@ -177,11 +177,10 @@ const ThreadContentMessages = React.forwardRef<
                 <ReasoningInfo />
                 <MessageImages />
                 <MessageContent
-                  className={
-                    message.role === "assistant"
-                      ? "text-foreground font-sans"
-                      : "text-foreground bg-container hover:bg-backdrop font-sans"
-                  }
+                  className={cn(
+                    "font-mono",
+                    message.role === "assistant" ? "" : "hover:bg-cyan-500/20"
+                  )}
                 />
                 <ToolcallInfo />
                 <MessageRenderedComponentArea className="w-full" />

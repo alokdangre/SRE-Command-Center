@@ -111,7 +111,7 @@ export const MessageThreadFull = React.forwardRef<
         </MessageSuggestions>
 
         {/* Message input */}
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 mt-auto">
           <MessageInput>
             <MessageInputTextarea placeholder="Type your message or paste images..." />
             <MessageInputToolbar>

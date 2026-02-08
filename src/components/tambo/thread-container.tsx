@@ -44,7 +44,7 @@ export const ThreadContainer = React.forwardRef<
       ref={mergedRef}
       className={cn(
         // Base layout and styling
-        "flex flex-col overflow-hidden bg-background",
+        "flex flex-col overflow-hidden bg-transparent",
         "h-full",
 
         // Add smooth transitions for layout changes
@@ -52,20 +52,20 @@ export const ThreadContainer = React.forwardRef<
 
         // Sidebar spacing based on history position (unless disabled)
         !disableSidebarSpacing &&
-          (historyPosition === "right"
-            ? "mr-[var(--sidebar-width,16rem)]"
-            : "ml-[var(--sidebar-width,16rem)]"),
+        (historyPosition === "right"
+          ? "mr-[var(--sidebar-width,16rem)]"
+          : "ml-[var(--sidebar-width,16rem)]"),
 
         // Width constraints based on canvas presence (unless sidebar spacing disabled)
         !disableSidebarSpacing &&
-          (hasCanvasSpace
-            ? "max-w-3xl"
-            : "w-[calc(100%-var(--sidebar-width,16rem))]"),
+        (hasCanvasSpace
+          ? "max-w-3xl"
+          : "w-[calc(100%-var(--sidebar-width,16rem))]"),
         disableSidebarSpacing && "flex-1",
 
         // Border styling when canvas is present
         hasCanvasSpace && (canvasIsOnLeft ? "border-l" : "border-r"),
-        hasCanvasSpace && "border-border",
+        hasCanvasSpace && "border-cyan-500/20",
 
         // Right alignment when specified
         !isLeftPanel && "ml-auto",

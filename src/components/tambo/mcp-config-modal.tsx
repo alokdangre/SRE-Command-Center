@@ -10,7 +10,7 @@ import {
 } from "@radix-ui/react-dropdown-menu";
 import { type McpServerInfo, MCPTransport } from "@tambo-ai/react";
 import { motion } from "framer-motion";
-import { ChevronDown, Trash2, X } from "lucide-react";
+import { ChevronDown, Trash2, X, Shield } from "lucide-react";
 import React from "react";
 import { createPortal } from "react-dom";
 import { Streamdown } from "streamdown";
@@ -185,9 +185,12 @@ function MyApp() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2 }}
     >
-      <div className="bg-card rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-4">
-          <h2 className="text-lg font-semibold">MCP Server Configuration</h2>
+      <div className="bg-[#05070a] border border-cyan-500/30 shadow-[0_0_30px_rgba(0,0,0,0.8)] max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto relative corner-border">
+        <div className="flex items-center justify-between p-6 border-b border-cyan-500/10 bg-cyan-500/5">
+          <h2 className="text-lg font-black uppercase tracking-tighter text-cyan-400 glow-text-cyan flex items-center gap-2">
+            <Shield className="w-5 h-5" />
+            MCP_LINK_PANEL
+          </h2>
           <button
             onClick={onClose}
             className="hover:bg-muted rounded-lg transition-colors cursor-pointer"
@@ -198,8 +201,8 @@ function MyApp() {
         </div>
 
         {/* Content */}
-        <div className="px-4 pb-4">
-          <div className="mb-6 bg-container border border-muted rounded-lg">
+        <div className="p-6">
+          <div className="mb-6 bg-black/80 border border-cyan-500/30">
             <button
               onClick={() => setShowInstructions(!showInstructions)}
               className="w-full flex items-center justify-between p-2 hover:bg-muted transition-colors cursor-pointer"
@@ -209,9 +212,8 @@ function MyApp() {
                 Setup Instructions
               </span>
               <ChevronDown
-                className={`w-4 h-4 text-foreground transition-transform duration-200 ${
-                  showInstructions ? "rotate-180" : ""
-                }`}
+                className={`w-4 h-4 text-foreground transition-transform duration-200 ${showInstructions ? "rotate-180" : ""
+                  }`}
               />
             </button>
             {showInstructions && (
@@ -261,7 +263,7 @@ function MyApp() {
                   value={serverUrl}
                   onChange={(e) => setServerUrl(e.target.value)}
                   placeholder="https://your-mcp-server-url.com"
-                  className="w-full px-3 py-2.5 border border-muted rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-150 text-sm"
+                  className="w-full px-3 py-2.5 border border-cyan-500/10 bg-black/40 text-cyan-50 placeholder:text-cyan-900/50 focus:outline-none focus:border-cyan-500/5 transition-all duration-150 text-xs font-mono"
                   required
                 />
               </div>
@@ -283,7 +285,7 @@ function MyApp() {
                   value={serverName}
                   onChange={(e) => setServerName(e.target.value)}
                   placeholder="Custom server name"
-                  className="w-full px-3 py-2.5 border border-muted rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-150 text-sm"
+                  className="w-full px-3 py-2.5 border border-cyan-500/10 bg-black/40 text-cyan-50 placeholder:text-cyan-900/50 focus:outline-none focus:border-cyan-500/5 transition-all duration-150 text-xs font-mono"
                 />
               </div>
 
@@ -296,24 +298,24 @@ function MyApp() {
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      className="w-full px-3 py-2.5 border border-muted rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-card text-foreground text-sm flex items-center justify-between hover:bg-muted-backdrop cursor-pointer transition-all duration-150"
+                      className="w-full px-3 py-2.5 border border-cyan-500/20 bg-black/40 text-cyan-50 text-sm flex items-center justify-between hover:bg-cyan-500/10 cursor-pointer transition-all duration-150 font-mono"
                     >
                       <span>{getTransportDisplayText(transportType)}</span>
-                      <ChevronDown className="w-4 h-4 text-foreground" />
+                      <ChevronDown className="w-4 h-4 text-cyan-500" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
-                    className="w-full min-w-[200px] bg-card border border-muted rounded-lg shadow-lg z-50 py-1 animate-in fade-in-0 zoom-in-95 duration-100"
+                    className="w-full min-w-[200px] bg-[#0a0f19] border border-cyan-500/30 shadow-[0_0_20px_rgba(0,0,0,0.5)] z-[100] py-1 animate-in fade-in-0 zoom-in-95 duration-100 font-mono"
                     align="start"
                   >
                     <DropdownMenuItem
-                      className="px-3 py-2 text-sm text-foreground hover:bg-muted-backdrop cursor-pointer focus:bg-muted-backdrop focus:outline-none"
+                      className="px-3 py-2 text-sm text-cyan-50/70 hover:text-cyan-400 hover:bg-cyan-500/10 cursor-pointer focus:bg-cyan-500/10 focus:outline-none transition-colors"
                       onClick={() => setTransportType(MCPTransport.HTTP)}
                     >
                       HTTP (default)
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      className="px-3 py-2 text-sm text-foreground hover:bg-muted-backdrop cursor-pointer focus:bg-muted-backdrop focus:outline-none"
+                      className="px-3 py-2 text-sm text-cyan-50/70 hover:text-cyan-400 hover:bg-cyan-500/10 cursor-pointer focus:bg-cyan-500/10 focus:outline-none transition-colors"
                       onClick={() => setTransportType(MCPTransport.SSE)}
                     >
                       SSE
@@ -325,9 +327,9 @@ function MyApp() {
 
             <button
               type="submit"
-              className="mt-6 w-full px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer transition-all duration-150 font-medium"
+              className="mt-6 w-full px-4 py-3 bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600/30 cursor-pointer transition-all duration-150 font-black uppercase tracking-widest text-xs"
             >
-              Add Server
+              INITIALIZE_LINK
             </button>
           </form>
 
@@ -353,7 +355,7 @@ function MyApp() {
                   return (
                     <div
                       key={index}
-                      className="flex items-start justify-between p-4 border border-muted rounded-lg hover:border-muted-backdrop transition-colors duration-150"
+                      className="flex items-start justify-between p-4 border border-cyan-500/10 bg-cyan-500/5 hover:border-cyan-500/30 transition-colors duration-150 font-mono"
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center mb-1">
@@ -398,7 +400,8 @@ function MyApp() {
           )}
 
           {/* Info Section */}
-          <div className="mt-8 bg-container border border-muted p-4 rounded-lg">
+          <div className="mt-8 border border-cyan-500/20 bg-black/80 p-4 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-cyan-500/5 blur-2xl pointer-events-none" />
             <h4 className="font-medium mb-2 text-foreground">What is MCP?</h4>
             <p className="text-foreground text-sm leading-relaxed">
               The{" "}
