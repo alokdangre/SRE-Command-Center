@@ -13,6 +13,9 @@
 - User Authentication (1/1)
 - GitHub Integration (Settings UI + API)
 - Prometheus Integration (Settings UI + API)
+- PagerDuty Integration (Settings UI + API)
+- Slack Integration (OAuth + API)
+- Kubernetes Integration (API + tool wiring, execution guardrails enabled)
 
 ### Remaining Work 🔴
 
@@ -31,13 +34,13 @@ The integrations are built, but the checklist shows tools as "Mock" - update che
 | `getActiveAlerts`         | Alertmanager       | ✅ Connected (needs checklist update) |
 | `getHealthMetrics`        | Prometheus         | ✅ Connected (needs checklist update) |
 | `analyzeRecentCommits`    | GitHub             | ✅ Connected (needs checklist update) |
-| `getCurrentIncident`      | PagerDuty          | ⬜ TODO                               |
-| `getIncidentTimelineData` | PagerDuty          | ⬜ TODO                               |
-| `getRemediationOptions`   | Kubernetes         | ⬜ TODO                               |
-| `executeRemediation`      | Kubernetes         | ⬜ TODO                               |
-| `getSlackContext`         | Slack              | ⬜ TODO                               |
-| `getRootCauseAnalysis`    | AI Enhanced        | ⬜ TODO                               |
-| `getAnomalyHeatmapData`   | ML/Prometheus      | ⬜ TODO                               |
+| `getCurrentIncident`      | PagerDuty          | ✅ Connected                          |
+| `getIncidentTimelineData` | PagerDuty          | ✅ Connected                          |
+| `getRemediationOptions`   | Kubernetes         | ✅ Connected (mock fallback)          |
+| `executeRemediation`      | Kubernetes         | ✅ Connected (guarded execution)      |
+| `getSlackContext`         | Slack              | ✅ Connected (mock fallback)          |
+| `getRootCauseAnalysis`    | AI Enhanced        | ✅ Connected (multi-source fallback) |
+| `getAnomalyHeatmapData`   | ML/Prometheus      | ✅ Connected (Prometheus + fallback) |
 
 ---
 
@@ -204,32 +207,32 @@ export const InteractableServiceCard = withInteractable(ServiceCard, {
 ### Sprint 1 (Current)
 
 1. ✅ Update TAMBO_CHECKLIST to reflect completed integrations
-2. 🔄 Implement PagerDuty integration
-3. 🔄 Connect `getCurrentIncident` and `getIncidentTimelineData`
+2. ✅ Implement PagerDuty integration
+3. ✅ Connect `getCurrentIncident` and `getIncidentTimelineData`
 
 ### Sprint 2
 
-4. Implement Slack integration (OAuth flow)
-5. Connect `getSlackContext`
-6. Implement Kubernetes integration basics
+4. ✅ Implement Slack integration OAuth flow in Settings UI
+5. ✅ Connect `getSlackContext`
+6. ✅ Implement Kubernetes integration basics
 
 ### Sprint 3
 
-7. Implement `executeRemediation` for Kubernetes
-8. Enhance `getRootCauseAnalysis` with real data aggregation
-9. Implement anomaly score calculation for `getAnomalyHeatmapData`
+7. ✅ Implement `executeRemediation` for Kubernetes
+8. ✅ Enhance `getRootCauseAnalysis` with real data aggregation
+9. ✅ Implement anomaly score calculation for `getAnomalyHeatmapData`
 
 ### Sprint 4
 
-10. Add Interactable Components
-11. Implement streaming support
-12. Add suggested actions
+10. ✅ Add Interactable Components
+11. ✅ Implement streaming support
+12. ✅ Add suggested actions
 
 ### Sprint 5
 
-13. Message history persistence
-14. Model selection
-15. Final polish and testing
+13. ✅ Message history persistence
+14. ✅ Model selection
+15. 🔄 Final polish and testing (build/tsc pass, lint backlog remains)
 
 ---
 
@@ -255,4 +258,4 @@ export const InteractableServiceCard = withInteractable(ServiceCard, {
 
 ## Next Action
 
-Starting with **Phase 1**: Update the TAMBO_CHECKLIST to reflect that GitHub and Prometheus integrations ARE connected (not just mock), then implement **PagerDuty integration**.
+Address lint backlog and run the complete manual QA playbook in `docs/MANUAL_TEST_USER_FLOWS.md` before release.

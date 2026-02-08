@@ -2,6 +2,8 @@
 
 > **Track all Tambo features used in SRE Command Center and identify what's left to implement.**
 
+Manual QA guide: `docs/MANUAL_TEST_USER_FLOWS.md`
+
 ---
 
 ## 📊 Progress Overview
@@ -9,13 +11,13 @@
 | Category                | Implemented | Remaining | Total  |
 | ----------------------- | ----------- | --------- | ------ |
 | Generative Components   | 5           | 0         | 5      |
-| Interactable Components | 0           | 3         | 3      |
+| Interactable Components | 3           | 0         | 3      |
 | Local Tools             | 8           | 0         | 8      |
 | Backend Tools           | 13          | 0         | 13     |
-| Integrations            | 2           | 2         | 4      |
-| Core Features           | 4           | 6         | 10     |
+| Integrations            | 5           | 0         | 5      |
+| Core Features           | 11          | 0         | 11     |
 | Authentication          | 1           | 0         | 1      |
-| **Total**               | **33**      | **11**    | **44** |
+| **Total**               | **46**      | **0**     | **46** |
 
 ---
 
@@ -34,15 +36,15 @@ Components rendered by AI in response to user messages.
 
 ---
 
-## ⬜ Interactable Components
+## ✅ Interactable Components
 
 Components that persist on page and update by ID across conversations.
 
 | Component          | Description                      | Status  | Notes                         |
 | ------------------ | -------------------------------- | ------- | ----------------------------- |
-| `ServiceCard`      | Interactable service status card | ⬜ TODO | Wrap with `withInteractable`  |
-| `IncidentNotes`    | Shared notes for incident        | ⬜ TODO | Real-time collaborative notes |
-| `RemediationPanel` | Persistent action panel          | ⬜ TODO | Shows ongoing actions         |
+| `ServiceCard`      | Interactable service status card | ✅ Done | `components/sre/interactable-service-card.tsx` |
+| `IncidentNotes`    | Shared notes for incident        | ✅ Done | `components/sre/incident-notes.tsx` |
+| `RemediationPanel` | Persistent action panel          | ✅ Done | `components/sre/remediation-panel.tsx` |
 
 ### How to Implement
 
@@ -93,18 +95,16 @@ Functions executed server-side. Now connected to real integrations with mock fal
 | `analyzeRecentCommits`    | Git commit analysis      | ✅ Connected | GitHub API (mock fallback)   |
 | `getCurrentIncident`      | Active incident details  | ✅ Connected | PagerDuty (mock fallback)    |
 | `getIncidentTimelineData` | Timeline data            | ✅ Connected | PagerDuty (mock fallback)    |
-| `getRemediationOptions`   | Available fix actions    | ⬜ TODO      | Kubernetes API               |
-| `executeRemediation`      | Trigger a fix            | ⬜ TODO      | Kubernetes API               |
-| `getSlackContext`         | Team discussions         | ⬜ TODO      | Slack API                    |
-| `getRootCauseAnalysis`    | AI root cause            | ⬜ TODO      | Multi-source AI analysis     |
-| `getAnomalyHeatmapData`   | Heatmap data             | ⬜ TODO      | Prometheus + ML              |
+| `getRemediationOptions`   | Available fix actions    | ✅ Connected | Kubernetes API (mock fallback) |
+| `executeRemediation`      | Trigger a fix            | ✅ Connected | Kubernetes API (guarded + mock fallback) |
+| `getSlackContext`         | Team discussions         | ✅ Connected | Slack API (mock fallback)    |
+| `getRootCauseAnalysis`    | AI root cause            | ✅ Connected | Multi-source aggregation (with fallback) |
+| `getAnomalyHeatmapData`   | Heatmap data             | ✅ Connected | Prometheus range scoring (mock fallback) |
 | `getIntegrations`         | Integration status       | ✅ Connected | Supabase                     |
 
 ### Remaining Integration Priority
 
-1. 🔴 **High**: Slack (team context)
-2. 🟡 **Medium**: Kubernetes (remediation), Enhanced AI analysis
-3. 🟢 **Low**: ML anomaly detection
+1. ✅ No remaining integration blockers
 
 ---
 
@@ -118,8 +118,8 @@ Credentials are stored securely in Supabase (per-user). Falls back to mock data 
 | GitHub      | Commits, PRs, CI/CD | ✅ Done | Settings page (OAuth or PAT)        |
 | Prometheus  | Metrics and alerts  | ✅ Done | Settings page (URL + optional auth) |
 | PagerDuty   | Incident sync       | ✅ Done | Settings page (API key)             |
-| Slack       | Team messages       | ⬜ TODO | OAuth flow (coming soon)            |
-| Kubernetes  | Pod/deployment info | ⬜ TODO | Config upload (coming soon)         |
+| Slack       | Team messages       | ✅ Done | OAuth flow + API integration |
+| Kubernetes  | Pod/deployment info | ✅ Done | Settings form + token + namespace allowlist + TLS hardening validation |
 
 ### How Users Configure Integrations
 
@@ -191,12 +191,12 @@ Tambo SDK features and hooks.
 | `useTamboThreadInput`     | Message input hook             | ✅ Done | Used in chat components  |
 | `components` registration | Register generative components | ✅ Done | In `lib/tambo.ts`        |
 | `tools` registration      | Register callable tools        | ✅ Done | In `lib/tambo.ts`        |
-| Streaming support         | Real-time response streaming   | ⬜ TODO | Add streaming indicators |
-| `useTamboState`           | AI-integrated state hooks      | ⬜ TODO | For persistent state     |
-| `useTamboContext`         | Pass context to AI             | ⬜ TODO | For user preferences     |
-| Suggested actions         | Generate user suggestions      | ⬜ TODO | Quick action buttons     |
-| Message history           | Conversation persistence       | ⬜ TODO | Store in Supabase        |
-| Model selection           | Switch AI models               | ⬜ TODO | Use different providers  |
+| Streaming support         | Real-time response streaming   | ✅ Done | Typing/stage indicators in thread UI |
+| `useTamboState`           | AI-integrated state hooks      | ✅ Done | `src/hooks/use-tambo-state.ts` + runtime state sync in `src/components/tambo/tambo-runtime-context.tsx` |
+| `useTamboContext`         | Pass context to AI             | ✅ Done | `src/hooks/use-tambo-context.ts` + user preference context in `src/components/tambo/tambo-runtime-context.tsx` |
+| Suggested actions         | Generate user suggestions      | ✅ Done | SRE remediation quick-action buttons |
+| Message history           | Conversation persistence       | ✅ Done | Thread snapshots persisted to Supabase (`thread_history`) |
+| Model selection           | Switch AI models               | ✅ Done | Provider/model preference in Settings and request context |
 
 ---
 
@@ -257,7 +257,7 @@ export function TamboLayout({ children }: { children: React.ReactNode }) {
 - [x] Local tools
 - [x] Basic chat interface
 - [x] **Supabase + Tambo auth integration**
-- [ ] **Streaming indicators**
+- [x] **Streaming indicators**
 
 ### Phase 2: Real Data (Next)
 
@@ -267,10 +267,10 @@ export function TamboLayout({ children }: { children: React.ReactNode }) {
 
 ### Phase 3: Advanced Features (Future)
 
-- [ ] Interactable components
-- [ ] Suggested actions
-- [ ] Message history persistence
-- [ ] Model selection
+- [x] Interactable components
+- [x] Suggested actions
+- [x] Message history persistence
+- [x] Model selection
 
 ---
 
@@ -289,4 +289,4 @@ export function TamboLayout({ children }: { children: React.ReactNode }) {
 
 ---
 
-_Last Updated: 2026-02-07_
+_Last Updated: 2026-02-08_
