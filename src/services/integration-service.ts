@@ -13,6 +13,12 @@ import type {
     KubernetesConfig,
 } from '@/types/integrations';
 
+export interface GitHubRepositoryOption {
+    id: number;
+    fullName: string;
+    private: boolean;
+}
+
 /**
  * Get all integrations for the current user
  */
@@ -21,7 +27,8 @@ export async function getUserIntegrations(): Promise<UserIntegration[]> {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-        throw new Error('User not authenticated');
+        // Protected routes normally guarantee auth, but avoid hard failures on transient auth refresh races.
+        return [];
     }
 
     const { data, error } = await supabase
@@ -30,11 +37,26 @@ export async function getUserIntegrations(): Promise<UserIntegration[]> {
         .eq('user_id', user.id);
 
     if (error) {
-        console.error('Error fetching integrations:', error);
-        throw error;
+        const message =
+            typeof error === "object" && error && "message" in error
+                ? String((error as { message?: string }).message)
+                : "Unknown Supabase error";
+        const code =
+            typeof error === "object" && error && "code" in error
+                ? String((error as { code?: string }).code)
+                : "unknown";
+
+        // If schema has not been applied yet, treat as empty integrations and avoid noisy UI errors.
+        if (code === "42P01" || code === "PGRST205") {
+            console.warn("user_integrations table not found in schema cache. Returning empty integration list.");
+            return [];
+        }
+
+        console.error("Error fetching integrations:", { code, message });
+        throw new Error(`Failed to load integrations (${code}): ${message}`);
     }
 
-    return data as UserIntegration[];
+    return (data || []) as UserIntegration[];
 }
 
 /**
@@ -60,8 +82,16 @@ export async function getIntegration(type: IntegrationType): Promise<UserIntegra
             // No rows found
             return null;
         }
-        console.error('Error fetching integration:', error);
-        throw error;
+        const message =
+            typeof error === "object" && error && "message" in error
+                ? String((error as { message?: string }).message)
+                : "Unknown Supabase error";
+        const code =
+            typeof error === "object" && error && "code" in error
+                ? String((error as { code?: string }).code)
+                : "unknown";
+        console.error("Error fetching integration:", { code, message, type });
+        throw new Error(`Failed to fetch ${type} integration (${code}): ${message}`);
     }
 
     return data as UserIntegration;
@@ -196,6 +226,61 @@ export async function verifyGitHubIntegration(config: GitHubConfig): Promise<{ s
         return { success: true, username: user.login };
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to verify' };
+    }
+}
+
+/**
+ * Fetch repositories accessible with the provided GitHub token
+ */
+export async function fetchGitHubRepositories(token: string): Promise<{
+    success: boolean;
+    repos: GitHubRepositoryOption[];
+    error?: string;
+}> {
+    try {
+        if (!token) {
+            return { success: false, repos: [], error: 'No token provided' };
+        }
+
+        const response = await fetch(
+            'https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member',
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: 'application/vnd.github.v3+json',
+                },
+            }
+        );
+
+        if (!response.ok) {
+            const details = await response.text();
+            return {
+                success: false,
+                repos: [],
+                error: `GitHub repos API error: ${response.status} - ${details}`,
+            };
+        }
+
+        const data = await response.json();
+        if (!Array.isArray(data)) {
+            return { success: false, repos: [], error: 'Unexpected GitHub response format' };
+        }
+
+        const repos: GitHubRepositoryOption[] = data
+            .map((repo: { id?: number; full_name?: string; private?: boolean }) => ({
+                id: repo.id ?? 0,
+                fullName: repo.full_name ?? '',
+                private: Boolean(repo.private),
+            }))
+            .filter((repo: GitHubRepositoryOption) => repo.id > 0 && repo.fullName.includes('/'));
+
+        return { success: true, repos };
+    } catch (error) {
+        return {
+            success: false,
+            repos: [],
+            error: error instanceof Error ? error.message : 'Failed to fetch repositories',
+        };
     }
 }
 

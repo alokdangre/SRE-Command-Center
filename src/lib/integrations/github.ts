@@ -52,22 +52,23 @@ export async function fetchGitHubCommits(
     if (!config.github.enabled) {
         return {
             commits: [],
-            error: "GitHub integration not configured. Set GITHUB_TOKEN and GITHUB_REPO in .env.local",
+            error: "GitHub integration not configured for this user. Connect GitHub and select at least one repository in Settings.",
         };
     }
 
-    const { token, username, defaultRepo, repos } = config.github;
-    const owner = username;
-    const repo = defaultRepo || (repos && repos.length > 0 ? repos[0].split('/').pop() : undefined);
+    const { token, defaultRepo, repos } = config.github;
+    const repoFullName = defaultRepo || (repos && repos.length > 0 ? repos[0] : undefined);
     const limit = options.limit || 10;
     const since = options.since?.toISOString() || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    if (!token || !owner || !repo) {
+    if (!token || !repoFullName || !repoFullName.includes("/")) {
         return {
             commits: [],
-            error: "GitHub integration missing required configuration (token, username, or repo)",
+            error: "GitHub integration missing repository configuration. Add repository as owner/repo in Settings.",
         };
     }
+
+    const [owner, repo] = repoFullName.split("/");
 
     try {
         // Fetch commits list
@@ -152,19 +153,20 @@ export async function fetchGitHubPullRequests(
     if (!config.github.enabled) {
         return {
             pullRequests: [],
-            error: "GitHub integration not configured",
+            error: "GitHub integration not configured for this user.",
         };
     }
 
-    const { token, username, defaultRepo, repos } = config.github;
-    const owner = username;
-    const repo = defaultRepo || (repos && repos.length > 0 ? repos[0].split('/').pop() : undefined);
+    const { token, defaultRepo, repos } = config.github;
+    const repoFullName = defaultRepo || (repos && repos.length > 0 ? repos[0] : undefined);
     const state = options.state || "all";
     const limit = options.limit || 10;
 
-    if (!token || !owner || !repo) {
-        return { pullRequests: [], error: "GitHub integration missing required configuration" };
+    if (!token || !repoFullName || !repoFullName.includes("/")) {
+        return { pullRequests: [], error: "GitHub integration missing repository configuration. Add repository as owner/repo in Settings." };
     }
+
+    const [owner, repo] = repoFullName.split("/");
 
     try {
         const response = await fetch(
@@ -225,18 +227,19 @@ export async function fetchGitHubWorkflowRuns(
     if (!config.github.enabled) {
         return {
             runs: [],
-            error: "GitHub integration not configured",
+            error: "GitHub integration not configured for this user.",
         };
     }
 
-    const { token, username, defaultRepo, repos } = config.github;
-    const owner = username;
-    const repo = defaultRepo || (repos && repos.length > 0 ? repos[0].split('/').pop() : undefined);
+    const { token, defaultRepo, repos } = config.github;
+    const repoFullName = defaultRepo || (repos && repos.length > 0 ? repos[0] : undefined);
     const limit = options.limit || 10;
 
-    if (!token || !owner || !repo) {
-        return { runs: [], error: "GitHub integration missing required configuration" };
+    if (!token || !repoFullName || !repoFullName.includes("/")) {
+        return { runs: [], error: "GitHub integration missing repository configuration. Add repository as owner/repo in Settings." };
     }
+
+    const [owner, repo] = repoFullName.split("/");
 
     try {
         const response = await fetch(

@@ -24,8 +24,10 @@ import {
     saveIntegration,
     deleteIntegration,
     verifyGitHubIntegration,
+    fetchGitHubRepositories,
     verifyPrometheusIntegration,
     verifyKubernetesIntegration,
+    type GitHubRepositoryOption,
 } from "@/services/integration-service";
 import { INTEGRATION_INFO, type IntegrationType, type UserIntegration } from "@/types/integrations";
 import { UserNav } from "@/components/auth/user-nav";
@@ -38,6 +40,34 @@ import {
     type ModelProvider,
     type ModelSelection,
 } from "@/lib/model-selection";
+
+function getGitHubConnectionState(integration?: UserIntegration) {
+    if (!integration || integration.integration_type !== "github") {
+        return { connected: false, error: null as string | null };
+    }
+
+    const config = integration.config as {
+        type?: "oauth" | "pat";
+        access_token?: string;
+        pat?: string;
+        repos?: string[];
+    };
+
+    const hasToken =
+        (config.type === "oauth" && Boolean(config.access_token)) ||
+        (config.type === "pat" && Boolean(config.pat));
+    const repos = Array.isArray(config.repos) ? config.repos.filter(Boolean) : [];
+    const hasRepo = repos.length > 0;
+
+    if (hasToken && hasRepo) {
+        return { connected: true, error: null as string | null };
+    }
+    if (hasToken && !hasRepo) {
+        return { connected: false, error: "GitHub account connected, but repository is not configured yet." };
+    }
+
+    return { connected: false, error: null as string | null };
+}
 
 const ICONS: Record<string, React.ElementType> = {
     github: Github,
@@ -72,6 +102,16 @@ export default function SettingsPage() {
 
     function getIntegrationStatus(type: IntegrationType) {
         const integration = integrations.find(i => i.integration_type === type);
+        if (type === "github") {
+            const githubState = getGitHubConnectionState(integration);
+            return {
+                connected: githubState.connected,
+                enabled: integration?.is_enabled ?? false,
+                error: githubState.error || integration?.last_error || null,
+                lastVerified: integration?.last_verified_at,
+            };
+        }
+
         return {
             connected: !!integration,
             enabled: integration?.is_enabled ?? false,
@@ -146,6 +186,7 @@ export default function SettingsPage() {
                 ) : activeSetup ? (
                     <IntegrationSetup
                         type={activeSetup}
+                        existingIntegration={integrations.find(i => i.integration_type === activeSetup)}
                         onClose={() => setActiveSetup(null)}
                         onSave={loadIntegrations}
                     />
@@ -302,10 +343,12 @@ export default function SettingsPage() {
 // Integration Setup Component
 function IntegrationSetup({
     type,
+    existingIntegration,
     onClose,
     onSave
 }: {
     type: IntegrationType;
+    existingIntegration?: UserIntegration;
     onClose: () => void;
     onSave: () => void;
 }) {
@@ -319,6 +362,9 @@ function IntegrationSetup({
     // Form states for different integration types
     const [githubPat, setGithubPat] = useState("");
     const [githubRepos, setGithubRepos] = useState("");
+    const [githubDefaultRepo, setGithubDefaultRepo] = useState("");
+    const [githubAvailableRepos, setGithubAvailableRepos] = useState<GitHubRepositoryOption[]>([]);
+    const [githubReposLoading, setGithubReposLoading] = useState(false);
     const [prometheusUrl, setPrometheusUrl] = useState("");
     const [prometheusUser, setPrometheusUser] = useState("");
     const [prometheusPass, setPrometheusPass] = useState("");
@@ -332,6 +378,186 @@ function IntegrationSetup({
     const [kubernetesDefaultNamespace, setKubernetesDefaultNamespace] = useState("default");
     const [kubernetesNamespaces, setKubernetesNamespaces] = useState("default");
 
+    useEffect(() => {
+        if (!existingIntegration) return;
+
+        if (existingIntegration.integration_type === "github") {
+            const config = existingIntegration.config as {
+                repos?: string[];
+                default_repo?: string;
+            };
+            if (Array.isArray(config.repos) && config.repos.length > 0) {
+                setGithubRepos(config.repos.join(", "));
+            }
+            if (config.default_repo) {
+                setGithubDefaultRepo(config.default_repo);
+            } else if (Array.isArray(config.repos) && config.repos.length > 0) {
+                setGithubDefaultRepo(config.repos[0]);
+            }
+        }
+
+        if (existingIntegration.integration_type === "prometheus") {
+            const config = existingIntegration.config as {
+                url?: string;
+                username?: string;
+                password?: string;
+            };
+            setPrometheusUrl(config.url || "");
+            setPrometheusUser(config.username || "");
+            setPrometheusPass(config.password || "");
+        }
+
+        if (existingIntegration.integration_type === "pagerduty") {
+            const config = existingIntegration.config as {
+                api_key?: string;
+                service_ids?: string[];
+            };
+            setPagerdutyApiKey(config.api_key || "");
+            if (Array.isArray(config.service_ids) && config.service_ids.length > 0) {
+                setPagerdutyServices(config.service_ids.join(", "));
+            }
+        }
+
+        if (existingIntegration.integration_type === "kubernetes") {
+            const config = existingIntegration.config as {
+                cluster_name?: string;
+                cluster_url?: string;
+                token?: string;
+                ca_cert?: string;
+                skip_tls_verify?: boolean;
+                default_namespace?: string;
+                namespaces?: string[];
+            };
+            setKubernetesClusterName(config.cluster_name || "");
+            setKubernetesClusterUrl(config.cluster_url || "");
+            setKubernetesToken(config.token || "");
+            setKubernetesCaCert(config.ca_cert || "");
+            setKubernetesSkipTlsVerify(Boolean(config.skip_tls_verify));
+            setKubernetesDefaultNamespace(config.default_namespace || "default");
+            if (Array.isArray(config.namespaces) && config.namespaces.length > 0) {
+                setKubernetesNamespaces(config.namespaces.join(", "));
+            }
+        }
+    }, [existingIntegration]);
+
+    useEffect(() => {
+        if (type !== "github" || !existingIntegration || existingIntegration.integration_type !== "github") {
+            return;
+        }
+
+        const config = existingIntegration.config as {
+            type?: "oauth" | "pat";
+            access_token?: string;
+            pat?: string;
+            repos?: string[];
+            default_repo?: string;
+        };
+
+        const token =
+            (config.type === "oauth" ? config.access_token : config.pat) || "";
+        if (!token) {
+            return;
+        }
+
+        let cancelled = false;
+        const autoLoadRepos = async () => {
+            setGithubReposLoading(true);
+            const result = await fetchGitHubRepositories(token);
+            if (cancelled || !result.success) {
+                setGithubReposLoading(false);
+                return;
+            }
+
+            setGithubAvailableRepos(result.repos);
+            const preferred =
+                config.default_repo ||
+                (Array.isArray(config.repos) && config.repos.length > 0 ? config.repos[0] : "") ||
+                result.repos[0]?.fullName ||
+                "";
+            setGithubDefaultRepo((currentDefault) => currentDefault || preferred);
+            setGithubReposLoading(false);
+        };
+
+        void autoLoadRepos();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [type, existingIntegration]);
+
+    function parseGitHubRepos(rawRepos: string, preferredRepo: string): string[] {
+        const parsedRepos = rawRepos
+            .split(',')
+            .map((repo) => repo.trim())
+            .filter(Boolean);
+
+        if (preferredRepo && !parsedRepos.includes(preferredRepo)) {
+            parsedRepos.unshift(preferredRepo);
+        }
+
+        return Array.from(new Set(parsedRepos));
+    }
+
+    function getExistingGitHubToken(): string | null {
+        if (!existingIntegration || existingIntegration.integration_type !== "github") {
+            return null;
+        }
+
+        const config = existingIntegration.config as {
+            type?: "oauth" | "pat";
+            access_token?: string;
+            pat?: string;
+        };
+
+        if (config.type === "oauth" && config.access_token) {
+            return config.access_token;
+        }
+        if (config.type === "pat" && config.pat) {
+            return config.pat;
+        }
+
+        return null;
+    }
+
+    async function handleFetchGitHubRepos() {
+        setError(null);
+
+        const token = githubPat.trim() || getExistingGitHubToken();
+        if (!token) {
+            setError("Connect GitHub with OAuth or enter a PAT first, then fetch repositories.");
+            return;
+        }
+
+        setGithubReposLoading(true);
+        const result = await fetchGitHubRepositories(token);
+        setGithubReposLoading(false);
+
+        if (!result.success) {
+            setError(result.error || "Failed to fetch repositories");
+            return;
+        }
+
+        setGithubAvailableRepos(result.repos);
+
+        if (result.repos.length === 0) {
+            setError("No repositories were returned for this GitHub account.");
+            return;
+        }
+
+        const currentRepos = parseGitHubRepos(githubRepos, githubDefaultRepo);
+        const nextDefault =
+            githubDefaultRepo && result.repos.some(repo => repo.fullName === githubDefaultRepo)
+                ? githubDefaultRepo
+                : currentRepos.find(repo => result.repos.some(item => item.fullName === repo)) ||
+                result.repos[0].fullName;
+
+        setGithubDefaultRepo(nextDefault);
+
+        if (!githubRepos.trim()) {
+            setGithubRepos(nextDefault);
+        }
+    }
+
     async function handleGitHubOAuth() {
         // Redirect to GitHub OAuth via Supabase
         await signInWithGitHub();
@@ -342,26 +568,80 @@ function IntegrationSetup({
         setError(null);
 
         try {
-            const config = {
-                type: 'pat' as const,
-                pat: githubPat,
-                repos: githubRepos.split(',').map(r => r.trim()).filter(Boolean),
-            };
+            const parsedRepos = parseGitHubRepos(githubRepos, githubDefaultRepo);
 
-            // Verify first
-            setVerifying(true);
-            const verification = await verifyGitHubIntegration(config);
-            setVerifying(false);
+            // PAT flow
+            if (githubPat) {
+                if (parsedRepos.length === 0) {
+                    throw new Error("Add at least one repository (owner/repo) for GitHub analysis.");
+                }
 
-            if (!verification.success) {
-                throw new Error(verification.error);
+                const config = {
+                    type: 'pat' as const,
+                    pat: githubPat,
+                    repos: parsedRepos,
+                    default_repo: githubDefaultRepo || parsedRepos[0],
+                };
+
+                // Verify first
+                setVerifying(true);
+                const verification = await verifyGitHubIntegration(config);
+                setVerifying(false);
+
+                if (!verification.success) {
+                    throw new Error(verification.error);
+                }
+
+                // Save with username
+                await saveIntegration('github', { ...config, username: verification.username });
+                setSuccess(true);
+                onSave();
+                setTimeout(onClose, 1500);
+                return;
             }
 
-            // Save with username
-            await saveIntegration('github', { ...config, username: verification.username });
-            setSuccess(true);
-            onSave();
-            setTimeout(onClose, 1500);
+            // OAuth flow: allow saving repo configuration for already connected OAuth token.
+            if (existingIntegration?.integration_type === "github") {
+                const existingConfig = existingIntegration.config as {
+                    type?: "oauth" | "pat";
+                    access_token?: string;
+                    refresh_token?: string;
+                    username?: string;
+                };
+
+                if (existingConfig.type === "oauth" && existingConfig.access_token) {
+                    if (parsedRepos.length === 0) {
+                        throw new Error("Add at least one repository (owner/repo) for GitHub analysis.");
+                    }
+
+                    setVerifying(true);
+                    const verification = await verifyGitHubIntegration({
+                        type: "oauth",
+                        access_token: existingConfig.access_token,
+                        refresh_token: existingConfig.refresh_token,
+                    });
+                    setVerifying(false);
+
+                    if (!verification.success) {
+                        throw new Error(verification.error);
+                    }
+
+                    await saveIntegration("github", {
+                        type: "oauth",
+                        access_token: existingConfig.access_token,
+                        refresh_token: existingConfig.refresh_token,
+                        username: verification.username || existingConfig.username,
+                        repos: parsedRepos,
+                        default_repo: githubDefaultRepo || parsedRepos[0],
+                    });
+                    setSuccess(true);
+                    onSave();
+                    setTimeout(onClose, 1500);
+                    return;
+                }
+            }
+
+            throw new Error("Use GitHub OAuth first, or provide a PAT to connect GitHub.");
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to save');
         } finally {
@@ -528,7 +808,7 @@ function IntegrationSetup({
                                     Option 1: OAuth (Recommended)
                                 </h3>
                                 <p className="text-xs text-gray-400 mb-4">
-                                    Sign in with GitHub to securely connect your repositories.
+                                    Sign in with GitHub to connect your account, then add repositories below and click CONNECT.
                                 </p>
                                 <button
                                     onClick={handleGitHubOAuth}
@@ -583,6 +863,49 @@ function IntegrationSetup({
                                             className="w-full bg-black border border-gray-700 rounded px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none"
                                         />
                                     </div>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => void handleFetchGitHubRepos()}
+                                            disabled={githubReposLoading}
+                                            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        >
+                                            {githubReposLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+                                            {githubReposLoading ? "Fetching..." : "Fetch Repositories"}
+                                        </button>
+                                        {githubAvailableRepos.length > 0 && (
+                                            <span className="text-xs text-gray-500">
+                                                {githubAvailableRepos.length} repositories loaded
+                                            </span>
+                                        )}
+                                    </div>
+                                    {githubAvailableRepos.length > 0 && (
+                                        <div>
+                                            <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">
+                                                Repository to Analyze (default)
+                                            </label>
+                                            <select
+                                                value={githubDefaultRepo}
+                                                onChange={(e) => {
+                                                    const selectedRepo = e.target.value;
+                                                    setGithubDefaultRepo(selectedRepo);
+                                                    if (!githubRepos.trim()) {
+                                                        setGithubRepos(selectedRepo);
+                                                    }
+                                                }}
+                                                className="w-full bg-black border border-gray-700 rounded px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none"
+                                            >
+                                                {githubAvailableRepos.map((repo) => (
+                                                    <option key={repo.id} value={repo.fullName}>
+                                                        {repo.fullName}{repo.private ? " (private)" : ""}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <p className="text-xs text-gray-500 mt-2">
+                                                This repository is used first by commit/PR/workflow analysis tools.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -829,7 +1152,13 @@ function IntegrationSetup({
                                 }
                                 disabled={
                                     saving ||
-                                    (type === 'github' && !githubPat) ||
+                                    (type === 'github' &&
+                                        !githubPat &&
+                                        !(
+                                            existingIntegration?.integration_type === "github" &&
+                                            (existingIntegration.config as { type?: string; access_token?: string })?.type === "oauth" &&
+                                            Boolean((existingIntegration.config as { type?: string; access_token?: string })?.access_token)
+                                        )) ||
                                     (type === 'prometheus' && !prometheusUrl) ||
                                     (type === 'pagerduty' && !pagerdutyApiKey) ||
                                     (type === 'kubernetes' && (!kubernetesClusterUrl || !kubernetesToken))

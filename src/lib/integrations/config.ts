@@ -1,7 +1,7 @@
 /**
  * Integration Configuration
  * Manages connections to external services like GitHub, Prometheus, Slack, etc.
- * Fetches credentials from Supabase (user-configured) with fallback to environment variables (dev mode)
+ * Fetches credentials from Supabase (user-configured).
  */
 
 import { getIntegration } from "@/services/integration-service";
@@ -50,17 +50,16 @@ export interface IntegrationConfig {
     };
 }
 
-function parseBooleanEnv(value: string | undefined): boolean | undefined {
-    if (value === undefined) return undefined;
-    const normalized = value.trim().toLowerCase();
-    if (["1", "true", "yes", "on"].includes(normalized)) return true;
-    if (["0", "false", "no", "off"].includes(normalized)) return false;
-    return undefined;
+function normalizeRepoFullName(repo: string, username?: string): string {
+    const trimmed = repo.trim();
+    if (!trimmed) return "";
+    if (trimmed.includes("/")) return trimmed;
+    if (username) return `${username}/${trimmed}`;
+    return trimmed;
 }
 
 /**
  * Get integration configuration from Supabase
- * Falls back to environment variables for development/admin use
  */
 export async function getIntegrationConfig(): Promise<IntegrationConfig> {
     // Initialize with defaults
@@ -73,84 +72,66 @@ export async function getIntegrationConfig(): Promise<IntegrationConfig> {
     };
 
     try {
-        // Try to get GitHub from Supabase
         const githubIntegration = await getIntegration('github');
         if (githubIntegration?.is_enabled) {
             const ghConfig = githubIntegration.config as GitHubConfig;
+            const token = ghConfig.type === 'oauth' ? ghConfig.access_token : ghConfig.pat;
+            const repos = (ghConfig.repos || [])
+                .map(repo => normalizeRepoFullName(repo, ghConfig.username))
+                .filter(Boolean);
+            const normalizedDefaultRepo = ghConfig.default_repo
+                ? normalizeRepoFullName(ghConfig.default_repo, ghConfig.username)
+                : repos[0];
+            const hasRepo = Boolean(normalizedDefaultRepo || repos.length > 0);
+
             config.github = {
-                enabled: true,
-                token: ghConfig.type === 'oauth' ? ghConfig.access_token : ghConfig.pat,
-                repos: ghConfig.repos,
-                defaultRepo: ghConfig.default_repo,
+                enabled: Boolean(token && hasRepo),
+                token,
+                repos,
+                defaultRepo: normalizedDefaultRepo || undefined,
                 username: ghConfig.username,
             };
         }
     } catch {
-        // Fall back to env vars for development
-        if (process.env.GITHUB_TOKEN) {
-            const [owner, repo] = (process.env.GITHUB_REPO || '').split('/');
-            config.github = {
-                enabled: true,
-                token: process.env.GITHUB_TOKEN,
-                repos: process.env.GITHUB_REPO ? [process.env.GITHUB_REPO] : [],
-                defaultRepo: repo,
-                username: owner,
-            };
-        }
+        // Ignore transient integration fetch errors and keep disabled state.
     }
 
     try {
-        // Try to get Prometheus from Supabase
         const prometheusIntegration = await getIntegration('prometheus');
         if (prometheusIntegration?.is_enabled) {
             const promConfig = prometheusIntegration.config as PrometheusConfig;
             config.prometheus = {
-                enabled: true,
+                enabled: Boolean(promConfig.url),
                 url: promConfig.url,
                 username: promConfig.username,
                 password: promConfig.password,
             };
         }
     } catch {
-        // Fall back to env vars
-        if (process.env.PROMETHEUS_URL) {
-            config.prometheus = {
-                enabled: true,
-                url: process.env.PROMETHEUS_URL,
-            };
-        }
+        // Ignore transient integration fetch errors and keep disabled state.
     }
 
     try {
-        // Try to get Slack from Supabase
         const slackIntegration = await getIntegration('slack');
         if (slackIntegration?.is_enabled) {
             const slackConfig = slackIntegration.config as SlackConfig;
             config.slack = {
-                enabled: true,
+                enabled: Boolean(slackConfig.access_token),
                 accessToken: slackConfig.access_token,
                 teamName: slackConfig.team_name,
                 defaultChannel: slackConfig.default_channel,
             };
         }
     } catch {
-        // Fall back to env vars
-        if (process.env.SLACK_BOT_TOKEN) {
-            config.slack = {
-                enabled: true,
-                accessToken: process.env.SLACK_BOT_TOKEN,
-                defaultChannel: process.env.SLACK_DEFAULT_CHANNEL || '#incidents',
-            };
-        }
+        // Ignore transient integration fetch errors and keep disabled state.
     }
 
     try {
-        // Try to get Kubernetes from Supabase
         const k8sIntegration = await getIntegration('kubernetes');
         if (k8sIntegration?.is_enabled) {
             const k8sConfig = k8sIntegration.config as KubernetesConfig;
             config.kubernetes = {
-                enabled: true,
+                enabled: Boolean(k8sConfig.cluster_url && k8sConfig.token),
                 clusterUrl: k8sConfig.cluster_url,
                 token: k8sConfig.token,
                 defaultNamespace: k8sConfig.default_namespace,
@@ -160,41 +141,21 @@ export async function getIntegrationConfig(): Promise<IntegrationConfig> {
             };
         }
     } catch {
-        // Fall back to env vars
-        if (process.env.KUBERNETES_CLUSTER_URL && process.env.KUBERNETES_TOKEN) {
-            config.kubernetes = {
-                enabled: true,
-                clusterUrl: process.env.KUBERNETES_CLUSTER_URL,
-                token: process.env.KUBERNETES_TOKEN,
-                defaultNamespace: process.env.KUBERNETES_DEFAULT_NAMESPACE || "default",
-                allowedNamespaces: process.env.KUBERNETES_ALLOWED_NAMESPACES
-                    ? process.env.KUBERNETES_ALLOWED_NAMESPACES.split(",").map(ns => ns.trim()).filter(Boolean)
-                    : undefined,
-                caCert: process.env.KUBERNETES_CA_CERT || undefined,
-                skipTlsVerify: parseBooleanEnv(process.env.KUBERNETES_SKIP_TLS_VERIFY),
-            };
-        }
+        // Ignore transient integration fetch errors and keep disabled state.
     }
 
     try {
-        // Try to get PagerDuty from Supabase
         const pdIntegration = await getIntegration('pagerduty');
         if (pdIntegration?.is_enabled) {
             const pdConfig = pdIntegration.config as PagerDutyConfig;
             config.pagerduty = {
-                enabled: true,
+                enabled: Boolean(pdConfig.api_key),
                 apiKey: pdConfig.api_key,
                 serviceIds: pdConfig.service_ids,
             };
         }
     } catch {
-        // Fall back to env vars
-        if (process.env.PAGERDUTY_API_KEY) {
-            config.pagerduty = {
-                enabled: true,
-                apiKey: process.env.PAGERDUTY_API_KEY,
-            };
-        }
+        // Ignore transient integration fetch errors and keep disabled state.
     }
 
     return config;
@@ -231,10 +192,16 @@ export async function getIntegrationStatus(): Promise<Array<{
         {
             name: "GitHub",
             enabled: config.github.enabled,
-            status: config.github.enabled ? "connected" : "disconnected",
+            status: config.github.enabled
+                ? "connected"
+                : config.github.token
+                    ? "error"
+                    : "disconnected",
             details: config.github.enabled
-                ? `${config.github.username}${config.github.repos?.length ? ` (${config.github.repos.length} repos)` : ''}`
-                : "Not configured - Go to Settings to connect",
+                ? `${config.github.defaultRepo || config.github.repos?.[0] || config.github.username || "GitHub connected"}`
+                : config.github.token
+                    ? "Connected to GitHub account, but repository is not configured. Go to Settings > GitHub."
+                    : "Not configured - Go to Settings to connect",
         },
         {
             name: "Prometheus",
