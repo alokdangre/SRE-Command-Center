@@ -157,3 +157,51 @@ CREATE TRIGGER update_incidents_updated_at
     BEFORE UPDATE ON incidents
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- =========================================================================
+-- Thread History Table (Conversation Persistence)
+-- =========================================================================
+-- Stores thread snapshots for historical review and audit.
+
+CREATE TABLE IF NOT EXISTS thread_history (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    thread_id TEXT NOT NULL,
+    title TEXT,
+    message_count INTEGER DEFAULT 0,
+    last_message_at TIMESTAMPTZ,
+    last_message_preview TEXT,
+    thread_payload JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, thread_id)
+);
+
+-- Enable RLS
+ALTER TABLE thread_history ENABLE ROW LEVEL SECURITY;
+
+-- Users can only access their own thread history
+CREATE POLICY "Users can view their own thread history"
+    ON thread_history FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own thread history"
+    ON thread_history FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own thread history"
+    ON thread_history FOR UPDATE
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own thread history"
+    ON thread_history FOR DELETE
+    USING (auth.uid() = user_id);
+
+CREATE INDEX idx_thread_history_user_id ON thread_history(user_id);
+CREATE INDEX idx_thread_history_thread_id ON thread_history(thread_id);
+CREATE INDEX idx_thread_history_last_message_at ON thread_history(last_message_at DESC);
+
+CREATE TRIGGER update_thread_history_updated_at
+    BEFORE UPDATE ON thread_history
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
