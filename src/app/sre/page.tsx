@@ -54,7 +54,7 @@ function TerminalHeader() {
     }, []);
 
     return (
-        <div className="bg-black/80 border-b border-cyan-500/30 px-6 py-2 flex items-center justify-between font-mono text-xs overflow-hidden">
+        <div className="bg-black/80 border-b border-cyan-500/30 px-6 py-2 flex items-center justify-between font-mono text-xs relative z-50">
             <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                     <Terminal className="w-4 h-4 text-cyan-400" />

@@ -79,7 +79,7 @@ export function UserNav() {
                                     className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
                                 >
                                     <LogOut className="w-3 h-3" />
-                                    TERMINATE_SESSION
+                                    LOGOUT // TERMINATE_SESSION
                                 </button>
                             </form>
                         </div>
