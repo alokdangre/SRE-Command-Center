@@ -2,7 +2,7 @@
 
 > **Autonomous Incident Response System // Neural-link Enabled // Multi-tool Orchestration**
 
-![SRE Command Center Video](https://youtu.be/d8DLMiqORqM)
+SRE Command Center Video-->(https://youtu.be/d8DLMiqORqM)
 
 ## 📖 Introduction
 
