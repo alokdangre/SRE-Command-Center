@@ -6,7 +6,6 @@
  */
 
 import { useState, useEffect } from "react";
-import dynamic from "next/dynamic";
 import { TamboProviderWithAuth } from "@/components/auth/tambo-provider-with-auth";
 import {
     MessageInput,
@@ -38,12 +37,9 @@ import {
     Cpu,
     Database,
     Settings,
+    MessageSquare,
 } from "lucide-react";
 import Link from "next/link";
-
-const DictationButton = dynamic(() => import("@/components/tambo/dictation-button"), {
-    ssr: false,
-});
 
 function TerminalHeader() {
     const [time, setTime] = useState("--:--:--");
@@ -219,10 +215,20 @@ export default function SRECommandCenter() {
                                             <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
                                             <span className="text-xs font-bold text-cyan-500 uppercase">AI_CONS_01</span>
                                         </div>
-                                        <div className="flex gap-1">
-                                            <div className="w-3 h-1 bg-cyan-500/30" />
-                                            <div className="w-3 h-1 bg-cyan-500/30" />
-                                            <div className="w-3 h-1 bg-cyan-500" />
+                                        <div className="flex items-center gap-3">
+                                            <Link
+                                                href="/chat"
+                                                className="inline-flex items-center gap-1 border border-cyan-500/30 px-2 py-1 text-[10px] uppercase tracking-widest text-cyan-300 hover:bg-cyan-500/10"
+                                                title="Open full chat mode"
+                                            >
+                                                <MessageSquare className="w-3 h-3" />
+                                                FULL_CHAT
+                                            </Link>
+                                            <div className="flex gap-1">
+                                                <div className="w-3 h-1 bg-cyan-500/30" />
+                                                <div className="w-3 h-1 bg-cyan-500/30" />
+                                                <div className="w-3 h-1 bg-cyan-500" />
+                                            </div>
                                         </div>
                                     </div>
 
@@ -244,7 +250,6 @@ export default function SRECommandCenter() {
                                                 placeholder="Enter command or natural language request..."
                                             />
                                             <MessageInputToolbar>
-                                                <DictationButton />
                                                 <MessageInputSubmitButton />
                                             </MessageInputToolbar>
                                         </MessageInput>

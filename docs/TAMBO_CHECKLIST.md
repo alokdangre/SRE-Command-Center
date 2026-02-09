@@ -2,6 +2,8 @@
 
 > **Track all Tambo features used in SRE Command Center and identify what's left to implement.**
 
+Elevator pitch: **AI-powered SRE command center for faster incident response and real-time system insight.**
+
 Manual QA guide: `docs/MANUAL_TEST_USER_FLOWS.md`
 
 ---
