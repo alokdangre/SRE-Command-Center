@@ -148,24 +148,6 @@ Secure access control for your team.
 - **Icons**: Lucide React
 - **Validation**: Zod
 - **Animation**: Framer Motion
-
-## 🗺️ Roadmap
-
-- [x] Generative UI Components
-- [x] AI Tool Integration (Mock Data)
-- [x] Supabase Authentication
-- [ ] **Phase 2**: Real Data Integrations
-  - [ ] Prometheus/Grafana API
-  - [ ] GitHub MCP (commits, PRs)
-  - [ ] Slack MCP (team context)
-  - [ ] Kubernetes API
-- [ ] **Phase 3**: Remediation Engine
-  - [ ] Real rollback/scale actions
-  - [ ] Runbook automation
-- [ ] **Phase 4**: Advanced AI
-  - [ ] Predictive alerting
-  - [ ] Auto post-mortem generation
-
 ---
 
 _(C) 2026 TAMBO_AI // ENC_DEPT_BETA_
